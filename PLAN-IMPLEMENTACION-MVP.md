@@ -269,7 +269,7 @@ core/utils    →  (nada, salvo domain)
 | **S01** | [Base de datos Drift](#s01--base-de-datos-drift) | S00 | `[x]` |
 | **S02** | [Dominio y cálculos financieros](#s02--dominio-y-cálculos) | S01 | `[x]` |
 | **S03** | [Categorías](#s03--categorías) | S02 | `[x]` |
-| **S04** | [Registro de movimientos](#s04--registro-de-movimientos) | S03 | `[ ]` |
+| **S04** | [Registro de movimientos](#s04--registro-de-movimientos) | S03 | `[x]` |
 | **S05** | [Historial](#s05--historial) | S04 | `[ ]` |
 | **S06** | [Dashboard y resumen mensual](#s06--dashboard-y-resumen-mensual) | S05 | `[ ]` |
 | **S07** | [Estados vacíos y pulido](#s07--estados-vacíos-y-pulido) | S06 | `[ ]` |
@@ -2971,23 +2971,60 @@ flutter run
 ```
 
 **Debe cumplirse:**
-- [ ] `flutter analyze` → `No issues found!`
-- [ ] El FAB abre el formulario; el fondo es `#F8FAFC`
-- [ ] `SegmentedButton` alterna entre Gasto e Ingreso, y **la categoría se limpia** al cambiar de tipo
-- [ ] El teclado solo permite dígitos; no se puede escribir `-` ni `$`
-- [ ] Guardar sin categoría muestra el error bajo el grid
-- [ ] `showDatePicker` no deja elegir fecha futura
-- [ ] El límite de descripción es 100 caracteres
-- [ ] Tras guardar, la pantalla se cierra y aparece el SnackBar
-- [ ] Un movimiento nuevo aparece en el historial sin reiniciar la app
-- [ ] Editar precarga monto, tipo, categoría, fecha y descripción
-- [ ] Eliminar pide confirmación y borra
+- [x] `flutter analyze` → `No issues found!`
+- [x] El FAB abre el formulario; el fondo es `#F8FAFC`
+- [x] `SegmentedButton` alterna entre Gasto e Ingreso, y **la categoría se limpia** al cambiar de tipo
+- [x] El teclado solo permite dígitos; no se puede escribir `-` ni `$`
+- [x] Guardar sin categoría muestra el error bajo el grid
+- [x] `showDatePicker` no deja elegir fecha futura
+- [x] El límite de descripción es 100 caracteres
+- [x] Tras guardar, la pantalla se cierra y aparece el SnackBar
+- [x] Un movimiento nuevo aparece en el historial sin reiniciar la app
+- [x] Editar precarga monto, tipo, categoría, fecha y descripción
+- [x] Eliminar pide confirmación y borra
 
 **Checkpoint:**
 ```bash
 git add -A
 git commit -m "S04: formulario de registro y edición de movimientos"
 ```
+
+### Desviaciones registradas en S04
+
+| Tema | El plan decía | Se hizo | Por qué |
+|---|---|---|---|
+| **`FamilyNotifier<State, Arg>`** | "Riesgo a verificar" | **No existe** en Riverpod 3.3.2. Se usa un `NotifierProvider` normal + `load(id)` explícito | Verificado en el paquete instalado: `NotifierProviderFamily` exige `NotifierT extends Notifier<StateT>` y `Notifier.build()` **no recibe argumento**. La familia hecha a mano no puede leer el id sin codegen. El plan además proponía una alternativa ("un `Notifier` normal leyendo `arg` en `build`") tampoco funciona, porque `build()` no recibe nada. Solución: la pantalla llama `load(widget.id)` en `initState`. |
+| **`ref.watch(movementByIdProvider(id))` en `build`** | Reconstruir el form al cambiar el movimiento | `await getById(id)` dentro de `load` | Un `build` síncrono no puede esperar un `FutureProvider`. `load` es explícito y su resultado es testeable. |
+| **Carga y guardado** | Sin candado | `isLoading` + botón deshabilitado | Mientras carga el movimiento a editar, `state.id` sigue siendo `null`: sin candado, guardar crearía un **duplicado** en vez de actualizar. Hay un test para eso. |
+| **Id inexistente** | `orElse: () => MovementFormState(date: _today())` | Igual, pero con `isLoading: false` explícito | Si el movimiento se borró desde otro sitio, el formulario degrada a creación en vez de quedarse en un estado que no se puede guardar. |
+| **Error de categoría duplicado** | Se pintaba bajo el grid **y** en el bloque final | Solo bajo el grid | `saveError` recibe el primer error de validación, así que "Selecciona una categoría" salía dos veces por pantalla. El bloque genérico ahora se oculta cuando el error ya está visible junto a su campo. Lo detectó el test que exigía `findsOneWidget`. |
+| **`validateMovement` vs `firstError`** | Dos listas de reglas paralelas | El controlador delega en `validateMovement` | El plan definía el orden de errores en los dos sitios. Se unificaron en el validador, que es el único sitio con las reglas, y se cambió su orden al de pantalla (monto → categoría → fecha → descripción). |
+| **`load(null)`** | No contemplado | Vuelve al estado de creación | La misma pantalla atende ambos casos; sin esto, reutilizarla tras una edición dejaría los datos viejos. |
+| **`const CurrencyFormatter` en el prefijo** | `const CurrencyFormatter(CurrencyCode.cop).symbol` | `CurrencyFormatter.cop.symbol` | Ver desviaciones de S02: la clase ya no es `const` porque cachea el `NumberFormat`. |
+| **`showDatePicker` con fecha futura** | `initialDate: value ?? now` | `_clamp(value, today)` | `showDatePicker` exige `initialDate` dentro de `[first, last]`. Con un movimiento corrupto de fecha futura, el `?? now` no protege y el diálogo lanza la aserción. |
+| **`onSelectionChanged` vacío** | `onChanged(s.first)` | Guarda contra `selection.isEmpty` | La firma permite un set vacío; `s.first` reventaría. |
+| **Carga del grid de categorías** | `CircularProgressIndicator` | Texto "Cargando categorías…" | Los providers ya devuelven `[]` en lugar de un `AsyncValue` en carga (ver S03), así que un spinner no corresponde a ningún estado real. |
+| **Borrar sin `try/catch`** | `await delete(id)` directo | Con `try/catch` y SnackBar de error | Un fallo de base no debe cerrar la pantalla como si hubiera éxito. |
+| **Tests de S04** | En S08 | 31 tests (18 de controlador, 13 de widget) | Ver la nota de abajo sobre el harness. |
+
+**Dos cosas que costaron sangre en los tests de widget, aplicables a S05–S07:**
+
+1. **El formulario necesita un `GoRouter` real en el test.** Se cierra con
+   `context.pop()`, así que sin un router la pantalla revienta *después* de
+   guardar. El harness monta un `MaterialApp.router` con una pantalla de inicio
+   y navega con `context.push` (no `go`: `go` reemplaza la pila y no deja a lo
+   que volver).
+2. **La ventana del test es de 800x600 y el formulario es un `ListView` largo.**
+   Los campos inferiores no se construyen, así que `find.text('Fecha')` daba 0
+   resultados y `find.byType(TextField).last` devolvía `null`. Se fija
+   `tester.view.physicalSize` a 1000x2800 al inicio de cada test. Los taps
+   sobre etiquetas de `InputDecorator` tampoco son hit-testables: hay que
+   apuntar al `InkWell` interno.
+
+**Estado de aceptación S04:** los 11 puntos de "Debe cumplirse" verificados
+con tests, salvo los dos que son visuales y se comprobarán en el dispositivo:
+el fondo `#F8FAFC` y el aspecto del `SegmentedButton`. Total de la suite: 115
+tests, todos en verde, y `flutter build apk --debug` compila.
 
 ---
 

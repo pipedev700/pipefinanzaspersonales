@@ -70,7 +70,11 @@ ValidationResult validateDate(DateTime? date, {DateTime? now}) {
 }
 
 /// §15 — Valida el formulario completo. Devuelve el primer error, en el orden
-/// en que aparecen los campos en pantalla.
+/// en que aparecen los campos en pantalla: monto, categoría, fecha,
+/// descripción.
+///
+/// `MovementFormState.firstError` delega aquí, así que la lista de reglas vive
+/// en un solo sitio.
 ValidationResult validateMovement({
   required String amount,
   required String description,
@@ -80,10 +84,10 @@ ValidationResult validateMovement({
 }) {
   final checks = <ValidationResult>[
     validateAmount(amount),
-    validateDate(date, now: now),
-    validateDescription(description),
     if (categoryId == null)
       const ValidationResult.invalid('Selecciona una categoría'),
+    validateDate(date, now: now),
+    validateDescription(description),
   ];
 
   for (final check in checks) {

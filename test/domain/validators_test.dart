@@ -107,13 +107,26 @@ void main() {
         'El monto debe ser mayor a cero',
       );
 
-      // Monto válido, fecha futura, categoría ausente: gana la fecha.
+      // Monto válido, categoría ausente, fecha futura: gana la categoría,
+      // porque va antes que la fecha en pantalla.
       expect(
         validateMovement(
           amount: '25000',
           description: '',
           date: DateTime(2026, 3, 20),
           categoryId: null,
+          now: now,
+        ).error,
+        'Selecciona una categoría',
+      );
+
+      // Con categoría ya elegida, la fecha futura sí se reporta.
+      expect(
+        validateMovement(
+          amount: '25000',
+          description: '',
+          date: DateTime(2026, 3, 20),
+          categoryId: 1,
           now: now,
         ).error,
         'La fecha no puede ser futura',

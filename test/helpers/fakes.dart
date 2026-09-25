@@ -75,6 +75,21 @@ class FakeMovementRepository implements MovementRepository {
   final _controller = StreamController<List<Movement>>.broadcast();
   int _nextId = 1000;
 
+  /// Drafts enviados a `create`, en orden. Permite comprobar qué se habría
+  /// escrito en la base sin inspeccionar la entidad mapeada.
+  final creados = <MovementDraft>[];
+
+  /// Movimientos actuales.
+  List<Movement> get list => _movements;
+
+  int get total => _movements.length;
+
+  /// Reemplaza el contenido y notifica a los listeners, como haría la BD.
+  void emit(List<Movement> next) {
+    _movements = List.of(next);
+    _controller.add(_movements);
+  }
+
   @override
   Stream<List<Movement>> watchAll() async* {
     yield _movements;
@@ -106,6 +121,7 @@ class FakeMovementRepository implements MovementRepository {
 
   @override
   Future<int> create(MovementDraft draft) async {
+    creados.add(draft);
     final movement = Movement(
       id: _nextId++,
       amount: draft.amount,
