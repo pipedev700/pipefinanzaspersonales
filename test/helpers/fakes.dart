@@ -34,6 +34,33 @@ final testCategories = <Category>[
   buildCategory(id: 3, name: 'Salario', type: MovementType.income, iconKey: 'work', sortOrder: 3),
 ];
 
+/// Constructor de movimientos de pruebas. `id` y `date` se pasan siempre
+/// explícitos porque el orden del historial depende de ambos.
+Movement buildMovement({
+  required int id,
+  required int amount,
+  required DateTime date,
+  MovementType type = MovementType.expense,
+  int? categoryId,
+  String description = '',
+  String? categoryName,
+}) {
+  final catId = categoryId ?? (type.isIncome ? 3 : 1);
+  return Movement(
+    id: id,
+    amount: amount,
+    type: type,
+    category: buildCategory(
+      id: catId,
+      name: categoryName ?? (type.isIncome ? 'Salario' : 'Comida'),
+    ),
+    date: date,
+    description: description,
+    createdAt: date,
+    updatedAt: date,
+  );
+}
+
 class FakeCategoryRepository implements CategoryRepository {
   FakeCategoryRepository([List<Category>? initial])
     : _categories = List.of(initial ?? testCategories);
@@ -90,26 +117,37 @@ class FakeMovementRepository implements MovementRepository {
     _controller.add(_movements);
   }
 
+  /// Simula un fallo de la consulta, para probar el estado de error de la
+  /// pantalla. El stream es broadcast, así que si nadie escucha el error se
+  /// descarta en vez de quedar pendiente.
+  void emitError(Object error) => _controller.addError(error);
+
   @override
   Stream<List<Movement>> watchAll() async* {
     yield _movements;
     yield* _controller.stream;
   }
 
+  /// El DAO real filtra en SQL **y ordena `date DESC`**. El fake replica las
+  /// dos cosas: si no, el historial en los tests saldría en orden distinto al
+  /// de producción y los tests de agrupación pasarían por casualidad.
+  List<Movement> _monthOf(DateTime month) {
+    final filtered = _movements
+        .where((m) => m.date.year == month.year && m.date.month == month.month)
+        .toList();
+    filtered.sort((a, b) => b.date.compareTo(a.date));
+    return filtered;
+  }
+
   @override
-  Stream<List<Movement>> watchByMonth(DateTime month) => watchAll().map(
-    (all) => all.where((m) => m.date.year == month.year && m.date.month == month.month).toList(growable: false),
-  );
+  Stream<List<Movement>> watchByMonth(DateTime month) =>
+      watchAll().map((_) => _monthOf(month));
 
   @override
   Future<List<Movement>> getAll() async => _movements;
 
   @override
-  Future<List<Movement>> getByMonth(DateTime month) async => _movements
-      .where(
-        (m) => m.date.year == month.year && m.date.month == month.month,
-      )
-      .toList(growable: false);
+  Future<List<Movement>> getByMonth(DateTime month) async => _monthOf(month);
 
   @override
   Future<Movement?> getById(int id) async {

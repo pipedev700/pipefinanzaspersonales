@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/movements/presentation/screens/history_screen.dart';
 import '../../features/movements/presentation/screens/movement_form_screen.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/app_splash.dart';
@@ -40,7 +41,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: AppRoutes.history,
-                builder: (context, state) => const HistoryPlaceholder(),
+                builder: (context, state) => const HistoryScreen(),
               ),
             ],
           ),

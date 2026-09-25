@@ -6,6 +6,7 @@ import 'package:pipefinanzaspersonales/features/categories/presentation/provider
 import 'package:pipefinanzaspersonales/features/movements/domain/entities/category.dart';
 import 'package:pipefinanzaspersonales/features/movements/domain/entities/movement_type.dart';
 
+import '../helpers/await_first_value.dart';
 import '../helpers/fakes.dart';
 
 /// Estos son tests de *lógica de provider*, no de widgets: no hay árbol de
@@ -23,23 +24,6 @@ ProviderContainer makeContainer(CategoryRepository repo) {
   addTearDown(container.dispose);
   container.listen(categoriesProvider, (_, _) {});
   return container;
-}
-
-/// Espera el primer valor con tope de intentos, propagando el error si el
-/// stream falla. Acotado a propósito: si el provider nunca carga, el test
-/// falla con un mensaje legible en vez de colgarse indefinidamente.
-Future<T> awaitFirstValue<T>(
-  AsyncValue<T> Function() read, {
-  String? description,
-  int maxAttempts = 100,
-}) async {
-  for (var i = 0; i < maxAttempts; i++) {
-    final value = read();
-    if (value.hasValue) return value.requireValue;
-    if (value.hasError) throw value.error!;
-    await Future<void>.delayed(Duration.zero);
-  }
-  fail('Timeout esperando: ${description ?? 'el primer valor del provider'}');
 }
 
 void main() {

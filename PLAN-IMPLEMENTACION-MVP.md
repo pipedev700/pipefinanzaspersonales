@@ -270,7 +270,7 @@ core/utils    →  (nada, salvo domain)
 | **S02** | [Dominio y cálculos financieros](#s02--dominio-y-cálculos) | S01 | `[x]` |
 | **S03** | [Categorías](#s03--categorías) | S02 | `[x]` |
 | **S04** | [Registro de movimientos](#s04--registro-de-movimientos) | S03 | `[x]` |
-| **S05** | [Historial](#s05--historial) | S04 | `[ ]` |
+| **S05** | [Historial](#s05--historial) | S04 | `[x]` |
 | **S06** | [Dashboard y resumen mensual](#s06--dashboard-y-resumen-mensual) | S05 | `[ ]` |
 | **S07** | [Estados vacíos y pulido](#s07--estados-vacíos-y-pulido) | S06 | `[ ]` |
 | **S08** | [Testing](#s08--testing) | S07 | `[ ]` |
@@ -3339,20 +3339,82 @@ flutter run
 ```
 
 **Debe cumplirse:**
-- [ ] `flutter analyze` → `No issues found!`
-- [ ] Los movimientos se agrupan por día, días en orden descendente
-- [ ] Cada cabecera de día muestra el subtotal de gastos del día
-- [ ] Tocar un movimiento abre el formulario en modo edición
-- [ ] Los controles ‹ › cambian de mes y la lista se actualiza
-- [ ] El botón › está deshabilitado en el mes actual
-- [ ] Mes sin movimientos muestra el estado vacío con acción
-- [ ] Al guardar en el historial, la lista se actualiza sin reiniciar
+- [x] `flutter analyze` → `No issues found!`
+- [x] Los movimientos se agrupan por día, días en orden descendente
+- [x] Cada cabecera de día muestra el subtotal de gastos del día
+- [x] Tocar un movimiento abre el formulario en modo edición
+- [x] Los controles ‹ › cambian de mes y la lista se actualiza
+- [x] El botón › está deshabilitado en el mes actual
+- [x] Mes sin movimientos muestra el estado vacío con acción
+- [x] Al guardar en el historial, la lista se actualiza sin reiniciar
 
 **Checkpoint:**
 ```bash
 git add -A
 git commit -m "S05: historial agrupado por día con filtro mensual"
 ```
+
+### Desviaciones registradas en S05
+
+**Cuatro cosas del código de ejemplo no compilaban o no funcionaban:**
+
+1. **`theme.textTheme.bodyStrong` y `theme.textTheme.label` no existen.** En
+   `TextTheme` de Flutter los estilos se llaman `labelLarge`/`labelMedium`/
+   `labelSmall` y no hay ningún `bodyStrong`. Esos nombres son los de
+   `AppTypography`, que sí los tiene. Se usan `AppTypography.bodyStrong` y
+   `AppTypography.label` directamente.
+2. **`FinancialCalculator.groupByDay` es un método de instancia, no estático.**
+   El plan lo pasaba como tear-off: `whenData(FinancialCalculator.groupByDay)`.
+   Compila solo con `static const calc = FinancialCalculator();`.
+3. **`DailyGroup` no está en `financial_summary.dart`.** Está en
+   `financial_values.dart`, junto a `CategoryBreakdown` y `MonthlyBar`. El
+   import del plan daba "undefined".
+4. **`Ref` no acepta `WidgetRef`.** `_showMonthPicker` tomaba `Ref ref` y se
+   le pasaba el `WidgetRef` del `build`. Es un `WidgetRef`.
+
+**Dos ajustes de comportamiento, ambos por el mismo motivo —el DAO manda en el
+orden—:**
+
+5. **`groupByDay` no reordena, y no debe hacerlo.** Conserva el orden de
+   entrada, y el DAO ya entrega `ORDER BY date DESC` (ver §28). Los días salen
+   del más reciente al más antiguo sin tocar nada. Meter un `sort` aquí "por
+   seguridad" lo rompería.
+6. **El fake no ordenaba.** `FakeMovementRepository.watchByMonth` filtraba por
+   mes pero devolvía en orden de inserción, o sea **distinto del de
+   producción**. Los tests de agrupación habrían pasado por casualidad y la
+   app real habría salido al revés. El fake ahora replica el `ORDER BY date
+   DESC` del DAO, y hay un test que fija el orden a propósito.
+
+**Una decisión de UI no contemplated:**
+
+7. **El botón `›` se deshabilita en el mes en curso.** `SelectedMonth.next()`
+   ya ignoraba el toque en ese caso (S04), así que el plan lo daba por bueno.
+   Pero un botón que no reacciona parece roto, no "llegaste al final". Se añade
+   `canAdvanceMonthProvider` y se pasa `onPressed: null`. Hay dos tests: uno de
+   que arranca deshabilitado y otro de que se rehabilita al retroceder y se
+   vuelve a bloquear.
+
+**El `initialDate` del selector de mes se clampa.** `showDatePicker` exige
+`initialDate` dentro de `[firstDate, lastDate]`. El mes en curso empieza el día
+1, siempre anterior a hoy, así que en la práctica no falla — pero el mismo
+trampa que ya rompió en el campo de fecha de S04, y aquí `lastDate` es *hoy*,
+no el día 1. Se clampa por defensividad.
+
+### Sobre los tests de esta etapa
+
+| Trampa | Qué pasó |
+|---|---|
+| **`awaitFirstValue` devuelve el valor rancio** | Al esperar una *actualización* tras `emit`, el provider ya tenía valor de la emisión anterior, así que el helper lo devolvía tal cual y el test comparaba contra datos viejos. Se añadió `awaitValueWhere`, que espera a que el valor **cumpla una condición**. |
+| **`find.byTooltip` no devuelve el `IconButton`** | Devuelve el `Tooltip` que lo envuelve, y el cast falla con `RawTooltip is not a subtype of IconButton`. Para mirar el `onPressed` hay que subir al ancestro. |
+| **`'$3'` no es una cadena literal** | Dart lee `$3` como inicio de interpolación y el analyzer da "Expected an identifier". Los importes con el símbolo se escriben `'-\$33.000'`. |
+| **`CurrencyFormatter.format` ya incluye el `$`** | Devuelve `'$33.000'`, no `'33.000'`. El encabezado del día muestra `-$33.000`. |
+| **Un día con un solo gasto muestra la cifra dos veces** | Una en el subtotal de la cabecera y otra en la fila. Es lo que dice el PRD y no es un error, pero un test ingenuo con `findsOneWidget` falla. Los tests de subtotal usan dos movimientos para que la suma no coincida con ninguna fila. |
+| **`pumpAndSettle` se cuelga con un `CircularProgressIndicator`** | Rompió el test de navegación de `widget_test.dart` en cuanto el historial pasó a ser real: con la base real la pantalla cae en estado de carga, el spinner anima sin fin y `pumpAndSettle` **nunca** termina. `widget_test.dart` ahora sustituye los repositorios por fakes. |
+| **Hacen falta los dos fakes, no solo el de movimientos** | Abrir el formulario de edición monta el selector de categorías, que sin override construye un `AppDatabase` real. Drift avisa por log de "created the database class AppDatabase multiple times". Sustituyendo ambos, el aviso desaparece. |
+
+**Estado de aceptación S05:** los 8 puntos de "Debe cumplirse" verificados con
+tests. Total de la suite: 143 tests, todos en verde, sin avisos de Drift, y
+`flutter build apk --debug` compila.
 
 ---
 
