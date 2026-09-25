@@ -266,7 +266,7 @@ core/utils    →  (nada, salvo domain)
 | ID | Secuencia | Depende de | Estado |
 |---|---|---|---|
 | **S00** | [Cimientos: estructura, tema, navegación](#s00--ciimientos) | — | `[x]` |
-| **S01** | [Base de datos Drift](#s01--base-de-datos-drift) | S00 | `[ ]` |
+| **S01** | [Base de datos Drift](#s01--base-de-datos-drift) | S00 | `[x]` |
 | **S02** | [Dominio y cálculos financieros](#s02--dominio-y-cálculos) | S01 | `[ ]` |
 | **S03** | [Categorías](#s03--categorías) | S02 | `[ ]` |
 | **S04** | [Registro de movimientos](#s04--registro-de-movimientos) | S03 | `[ ]` |
@@ -1375,6 +1375,38 @@ flutter analyze
 git add -A
 git commit -m "S01: esquema Drift, DAOs, repositorios y seed de 14 categorías"
 ```
+
+### Desviaciones registradas en S01
+
+Ocho diferencias respecto al plan. Las tres primeras resuelven las dudas que
+§6.1 había marcado como "verificar contra el paquete instalado"; las siguientes
+las detectaron los tests.
+
+| Tema | El plan decía | Se hizo | Por qué |
+|---|---|---|---|
+| **`equalsExp` (duda de §6.1)** | "verificar la firma exacta" | `categories.id.equalsExp(movements.categoryId)` | Confirmado: el lado izquierdo es la columna de la tabla del `innerJoin`, el derecho la expresión foránea. Tal cual estaba escrito. |
+| **Tipo del JOIN (duda de §6.1)** | "verificar" | `JoinedSelectStatement<HasResultSet, dynamic> _joined()` | Drift declara `join()` devolviendo `JoinedSelectStatement` **sin argumentos**; Dart rellena los bounds. El segundo parámetro queda en `dynamic` y el resultado se lee como `TypedResult`. Anotarlo `SimpleSelectStatement<...>` es incorrecto: esa clase expone `Selectable<MovementRow>` y no tiene `readTable`. |
+| **Actualización (duda implícita)** | `replace` | `write` | `replace` reescribe **todas** las columnas. Como el companion no lleva `createdAt`, la base le ponía una marca de tiempo nueva en **cada edición**. `write` solo toca las columnas presentes. Lo detectó el test de `createdAt`. |
+| **Granularidad de `DateTime`** | No considerada | Documentada en `tables.dart` | Drift serializa `DateTime` como unix en **segundos**. Dos ediciones en el mismo segundo dan el mismo `updatedAt`. No afecta al usuario (la UI del MVP no muestra esos campos) y hay un test que fija el límite. |
+| **`attachedDatabase`** | `=> (db as AppDatabase)` | No se overridea | En Drift 2.34 `attachedDatabase` es un campo `final` que asigna el constructor, y `db` es una extensión que devuelve `attachedDatabase`. Overriding con `db` causa **recursión infinita**. Las tablas se acceden con los getters `categories` / `movements` del mixin generado. |
+| **Orden de las entidades** | Entidades en S02 | `movement_type.dart`, `category.dart`, `movement.dart` en S01 | Los DAOs mapean a entidades de dominio: S01 no compila sin ellas. |
+| **Contratos de repositorio** | `movement_repository.dart` en S02 | En S01 | Las implementaciones de `data` los necesitan para compilar. A S02 solo quedan calculadora, validadores y formateador. |
+| **Comando de build_runner** | `--delete-conflicting-outputs` | `dart run build_runner build` | La flag se eliminó en build_runner 2.15.1. |
+
+**Dos detalles de imports que suelen morder:**
+
+- Un test que importa `package:drift/drift.dart` choca con `matcher`:
+  `isNull` e `isNotNull` existen en ambos. Resolver con
+  `import 'package:drift/drift.dart' hide isNull, isNotNull;`.
+- `MovementsCompanion` y `CategoryRow` se generan como `part` de
+  `app_database.dart`, no de `tables.dart`. Quien los necesite debe importar
+  `app_database.dart`.
+
+**Prueba añadida en S01:** `test/database/app_database_test.dart`, 18 tests que
+cubren semilla (14 filas, orden, idempotencia), JOIN sin N+1 ni duplicados,
+rango de mes `[start, end)`, normalización del draft, update, delete y
+integridad referencial. **`NativeDatabase.memory()` sí funciona en este
+entorno**, así que el nivel 2 de S08 queda confirmado.
 
 ---
 
@@ -4723,20 +4755,25 @@ El MVP está completo cuando **todo** lo siguiente es cierto:
 
 ### 6.1 Errores ya conocidos de este plan
 
-Este documento se escribió para ser ejecutable, pero contiene un punto que
-**debe verificarse contra el paquete instalado** antes de confiar en él:
+**Actualizado tras S01.** Las dos dudas que había aquí están resueltas y
+documentadas en §S01 — Desviaciones. Si vas a escribir un DAO nuevo, ten en
+cuenta:
 
-| Punto | Qué verificar |
+| Punto | Regla |
 |---|---|
-| `db.categories.id.equalsExp(db.movements.categoryId)` | La firma exacta de `equalsExp` en Drift 2.34. Si falla, invertir a `db.movements.categoryId.equalsExp(db.categories.id)` |
-| `FamilyNotifier<State, Arg>` en Riverpod 3.3.2 | La firma del `Notifier` de familia. Si falla, usar `NotifierProvider.autoDispose.family` con un `Notifier` normal leyendo `arg` en `build` |
-| `linearProgressIndicator` con `value` fraccional | Correcto: se pasa `porcentaje / 100`, no el porcentaje |
+| JOIN de Drift | El tipo es `JoinedSelectStatement<HasResultSet, dynamic>`. Se lee con `row.readTable(movements)`. No anularlo con `SimpleSelectStatement<...>`. |
+| `attachedDatabase` | No overridearlo. `db` es una extensión que devuelve `attachedDatabase`; overridear con `db` recursiona infinitamente. |
+| Tablas en el DAO | Usar los getters `categories` / `movements` del mixin generado, no `db.categories`. |
+| `replace` vs `write` | Para editar, `write`. `replace` pisa `createdAt` con una marca nueva. |
+| `DateTime` en Drift | Se serializa en **segundos**. Nada de assertions de milisegundo. |
+| `FamilyNotifier<State, Arg>` en Riverpod 3.3.2 | Sigue **sin verificar**. Relevant en S04. Si falla, usar `NotifierProvider.autoDispose.family` con un `Notifier` normal leyendo `arg` en `build`. |
+| `LinearProgressIndicator` | Espera una **fracción** (0..1), no un porcentaje. |
 
-Además, tres detalles de imports que el analizador marcará como
-`unused_import` si se copian sin revisar: `history_screen.dart` ya no importa
-`validators.dart` (no lo usa) y sí importa `domain/financial_summary.dart` para
-`DailyGroup`; `date_picker_field.dart` necesita `core/theme/app_spacing.dart`;
-`test/helpers/fakes.dart` necesita `dart:async`.
+Además, tres detalles de imports que el analizador marca como `unused_import` si
+se copian sin revisar: `history_screen.dart` no usa `validators.dart` y sí
+importa `domain/financial_summary.dart` para `DailyGroup`; `date_picker_field.dart`
+necesita `core/theme/app_spacing.dart`; `test/helpers/fakes.dart` necesita
+`dart:async`.
 
 ### 6.2 Reglas para no desviarse
 
