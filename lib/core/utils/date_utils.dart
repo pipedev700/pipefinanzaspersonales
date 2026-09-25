@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 const _kMonthNames = <String>[
   'Enero',
   'Febrero',
@@ -33,6 +31,11 @@ const _kShortMonths = <String>[
 /// D10 — Los nombres de mes salen de listas constantes: no se usa `DateFormat`
 /// porque `intl` exige `initializeDateFormatting` para fechas no-sistema,
 /// que es un fallo de runtime fácil de no detectar. La app es solo en español.
+///
+/// El archivo es Dart puro, sin `package/flutter`. El rango del mes que
+/// necesita el filtro de SQL vive en `MovementsDao.monthRange`, que devuelve
+/// un record justamente para no arrastrar Flutter a la capa de datos: aquí no
+/// hay `monthRange` porque no hay nada que lo use.
 abstract final class AppDateUtils {
   static String monthName(int month) => _kMonthNames[month - 1];
 
@@ -65,16 +68,6 @@ abstract final class AppDateUtils {
     }
     return formatMonth(date);
   }
-
-  /// Rango [start, end) del mes: el último día a medianoche del mes
-  /// siguiente. Comparable, seguro para índices y para filtrar en SQL.
-  static DateTimeRange monthRange(DateTime date) => DateTimeRange(
-    start: DateTime(date.year, date.month),
-    end: DateTime(date.year, date.month + 1),
-  );
-
-  static bool isSameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
 
   static String _two(int value) => value.toString().padLeft(2, '0');
 }

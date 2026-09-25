@@ -273,7 +273,7 @@ core/utils    →  (nada, salvo domain)
 | **S05** | [Historial](#s05--historial) | S04 | `[x]` |
 | **S06** | [Dashboard y resumen mensual](#s06--dashboard-y-resumen-mensual) | S05 | `[x]` |
 | **S07** | [Estados vacíos y pulido](#s07--estados-vacíos-y-pulido) | S06 | `[x]` |
-| **S08** | [Testing](#s08--testing) | S07 | `[ ]` |
+| **S08** | [Testing](#s08--testing) | S07 | `[x]` |
 | **S09** | [Release Android](#s09--release-android) | S08 | `[ ]` |
 
 ```text
@@ -4858,18 +4858,162 @@ flutter test
 ```
 
 **Debe cumplirse:**
-- [ ] `flutter test` termina en verde
-- [ ] Cobertura de `financial_calculator.dart` ≥ 90 % en las ramas de negocio
-- [ ] `validators_test.dart` cubre los 4 mensajes de error de §15
-- [ ] `currency_formatter_test.dart` cubre el separador de miles
-- [ ] El nivel 2 (BD real) pasa, o está `skip` con la causa documentada
-- [ ] `flutter analyze` sigue en `No issues found!`
+- [x] `flutter test` termina en verde
+- [x] Cobertura de `financial_calculator.dart` ≥ 90 % en las ramas de negocio
+- [x] `validators_test.dart` cubre los 4 mensajes de error de §15
+- [x] `currency_formatter_test.dart` cubre el separador de miles
+- [x] El nivel 2 (BD real) pasa, o está `skip` con la causa documentada
+- [x] `flutter analyze` sigue en `No issues found!`
 
 **Checkpoint:**
 ```bash
 git add -A
 git commit -m "S08: suite de tests de dominio y widgets con fakes"
 ```
+
+### Lo que encontró la cobertura real (y el plan no pedía)
+
+El objetivo de S08 es "cumplir §33", pero el plan daba por hecho que faltaban
+los tests de `financial_calculator`, `validators` y `currency_formatter`. Al
+medir, resulta que **esos tres archivos ya estaban al 100 %** de cobertura
+desde S02, y que el nivel 2 (base de datos real) **no falla por la DLL de
+sqlite3**: los 18 tests de S01 corren con `NativeDatabase.memory()` sin
+problemas en Windows. La advertencia del plan era razonable pero no
+sucedió. Lo que faltaba estaba en otro sitio.
+
+Cobertura medida antes de S08: **90,1 %** de `lib/` (sin contar los `.g.dart`
+generados). Los huecos que importaban:
+
+| Archivo | Antes | Qué le faltaba |
+|---|---|---|
+| `drift_category_repository.dart` | **0 %** | Nunca se había instanciado. S01 probó el DAO, no el repositorio: la capa que consume `presentation` estaba sin probar. |
+| `drift_movement_repository.dart` | 60 % | Las cinco lecturas (`watchAll`, `watchByMonth`, `getByMonth`, `getAll`, `getById`) no se invocaban nunca. |
+| `daos.dart` | 89 % | `MovementsDao.getById` — **la ruta que usa el formulario al editar** — y `watchAll`/`getAll` sin probar. |
+| `date_utils.dart` | 68 % | **No existía `date_utils_test.dart`**, siendo un archivo usado en cuatro sitios (selector, historial, gráfico, cabeceras de día). |
+| `validators.dart` | 100 % | Cobertura total, pero el texto de **dos de los cinco** mensajes de error no lo afirmaba ningún test. |
+| `entities/category.dart` | 20 % | `==` y `hashCode` sin ejecutar. |
+
+**La lección de los validadores es la que más importa.** `validators.dart`
+estaba al 100 % de cobertura de líneas y aun así producía cinco mensajes de
+error de los que solo tres estaban afirmados con su texto exacto
+(`'El monto es demasiado grande'` y `'Selecciona una fecha'` no aparecían en
+ninguna aserción). La rama se ejecutaba; el texto que lee el usuario no
+estaba fijado. Reescribir ese mensaje sin querer no rompía nada. Cobertura de
+línea no es cobertura de contrato, y el criterio del plan ("cubre los 4
+mensajes de §15") no lo detectaba: el archivo ya estaba "arriba".
+
+**El `==` por `id` de `Movement` se hizo depender de un test.** Compara solo
+por `id`, lo que hace que Riverpod no reconstruya el dashboard cuando un
+stream de Drift reemite objetos nuevos pero idénticos. "Corregirlo" para
+comparar todos los campos no rompería ningún test y haría que cada escritura
+reconstruyera la pantalla entera. Ahora hay tests que lo fijan, incluido el
+caso incómodo: dos movimientos sin persistir (`id` 0) **sí** se consideran
+iguales, y está escrito como limitación conocida, no como descuido.
+
+**El orden del enum es un contrato con la base de datos, y no lo tenía.**
+`intEnum<MovementType>()` persiste el **índice**, no el nombre. Reordenar el
+enum haría que todos los ingresos guardados se leyeran como gastos, sin error
+ni aviso: el balance de meses enteros cambiaría de signo y nada fallaría.
+Hay dos tests que fallan el día que alguien reordene las dos líneas del enum,
+que es justo cuando toca escribir una migración.
+
+**`watchAll` tenía que probarse con una suscripción viva, no con `.first`.**
+`stream.first` solo ve la emisión inicial, así que no puede demostrar que el
+dashboard se refresca solo al escribir. El test mantiene la suscripción
+abierta, escribe, y espera la segunda emisión.
+
+### Código muerto que encontró la medición
+
+Tres cosas que el plan daba por hechas y nadie usaba. No se les escribió un
+test para subir el porcentaje: se eliminaron o se conectaron.
+
+- **`CategoryBreakdown.ratio` eliminado.** Su documentación decía "el valor
+  exacto sin redondear, por si hay que pintar la barra", pero se calculaba
+  como `percentage / 100`, y `percentage` **ya viene redondeado a 1 decimal**.
+  No podía ser exacto sin llevar el total de gastos en el objeto, que no
+  lleva. Era además código muerto: el gráfico de S07 calcula su propia
+  escala. Un doc que miente sobre una precisión que no tiene es peor que
+  ningún doc.
+- **`AppDateUtils.monthRange` e `isSameDay` eliminados.** Nadie los llamaba.
+  `monthRange` además **duplicaba** `MovementsDao.monthRange` y devolvía el
+  `DateTimeRange` de Flutter, en un `core/utils` que arrastraba
+  `package:flutter/material.dart` por él solo. La DAO ya explicaba en un
+  comentario por qué usa un record en vez del `DateTimeRange` de Flutter
+  ("la capa de datos no depende de Flutter"); el duplicado en `utils`
+  contradecía esa decisión. Con ellos fuera, **`date_utils.dart` es Dart
+  puro**: sin import de Flutter, y sin `core` empezando a depender de
+  `material`.
+- **`MovementType.label` se conectó en vez de borrarse.** El selector de tipo
+  escribía los literales `'Gasto'` e `'Ingreso'` a mano, duplicando el enum.
+  Ahora el texto sale de `MovementType.label`: si mañana se renombra el tipo,
+  el selector cambia con él.
+
+Un cuarto caso se **dejó como está a propósito**: `SemanticColors.copyWith` y
+`lerp` no los llama el código de la app, los invoca el framework
+(`ThemeData.copyWith` y la animación de temas). Son contrato de
+`ThemeExtension` y no se pueden borrar, pero sí verificar: un `lerp` mal
+escrito se manifiesta como un color que salta al cambiar de tema, algo muy
+difícil de atribuir a su causa. Hay tests de los dos.
+
+### Qué NO se puede cubrir, y por qué es correcto
+
+Dos archivos quedan por debajo del 100 % a propósito:
+
+- **`tables.dart` está al 0 % y es imposible subirlo.** Sus getters de columna
+  (`IntColumn get id => integer().autoIncrement()()`) son declaraciones de
+  **tiempo de generación de código**. Invocarlos en runtime lanza
+  `Unsupported operation: This method should not be called at runtime. Are you
+  sure you re-ran the builder after changing your tables or databases?` — se
+  comprobó con una sonda que los tocaba a propósito. Drift 2.34 construye las
+  columnas en el `.g.dart`, no en runtime. Un 0 % aquí es la señal de que la
+  instrumentación funciona, no un agujero.
+- **`database_providers.dart` (0 %) y `repository_providers.dart` (50 %).**
+  Los providers no cubiertos construyen `AppDatabase()` real, que abre un
+  **archivo** en el disco mediante `driftDatabase(name: 'pipe_finanzas')` y
+  necesita `path_provider`, un canal de plataforma inexistente en
+  `flutter test`. Probarlos exigiría un directorio temporal y un mock del
+  canal: un arnés disproportionate para un `Provider` de una línea. Los tests
+  de widget los sustituyen por fakes justamente para no tocar esto.
+
+### Cobertura final
+
+**94,5 %** de `lib/` sin los `.g.dart` (1073/1135 líneas), subiendo desde
+90,1 %. Los archivos de negocio que fija el criterio de aceptación:
+
+| Archivo | Cobertura |
+|---|---|
+| `financial_calculator.dart` | **100 %** (74/74) |
+| `validators.dart` | **100 %** (30/30) |
+| `currency_formatter.dart` | **100 %** (15/15) |
+| `daos.dart` | **100 %** (84/84) |
+| `drift_movement_repository.dart` | **100 %** (25/25) |
+| `drift_category_repository.dart` | **100 %** (7/7) |
+| `date_utils.dart` | **100 %** (14/14) |
+| `movement_type.dart` | **100 %** (6/6) |
+| `entities/movement.dart` | **100 %** (17/17) |
+
+Por debajo del 90 % solo queda `history_screen.dart` (84,3 %), que es
+presentación y no lógica de negocio, y los dos archivos justificados de más
+arriba.
+
+**Estado de aceptación S08:**
+
+- [x] `flutter test` termina en verde — **235 tests**
+- [x] Cobertura de `financial_calculator.dart` ≥ 90 % en las ramas de negocio
+      — 100 %, y también sus 8 grupos de pruebas de §33
+- [x] `validators_test.dart` cubre los 4 mensajes de error de §15 — son
+      **cinco** en el código, y ahora los cinco están afirmados por texto
+- [x] `currency_formatter_test.dart` cubre el separador de miles
+- [x] El nivel 2 (BD real) pasa, o está `skip` con la causa documentada —
+      **pasa**: 18 tests de S01 + 13 nuevos de repositorios, sin `skip` y sin
+      la advertencia de DLL que el plan anticipaba
+- [x] `flutter analyze` sigue en `No issues found!`
+
+Nótese que el paso 1 del plan proponía escribir `financial_calculator_test.dart`
+y `validators_test.dart` "para cubrir §33". Ya existían y ya cumplían; lo que
+se hizo en S08 fue medir primero y tapar los huecos que la medición
+realmente señaló, que estaban en la capa de repositorios y en el texto de los
+mensajes.
 
 ---
 

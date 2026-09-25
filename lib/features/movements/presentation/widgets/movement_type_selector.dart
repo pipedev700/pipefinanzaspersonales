@@ -21,12 +21,14 @@ class MovementTypeSelector extends StatelessWidget {
       segments: [
         ButtonSegment(
           value: MovementType.expense,
-          label: const Text('Gasto'),
+          // La etiqueta vive en el enum: si mañana se renombra el tipo, el
+          // texto del selector cambia con él en vez de quedar desincronizado.
+          label: Text(MovementType.expense.label),
           icon: Icon(Icons.trending_down, color: semantic.expense),
         ),
         ButtonSegment(
           value: MovementType.income,
-          label: const Text('Ingreso'),
+          label: Text(MovementType.income.label),
           icon: Icon(Icons.trending_up, color: semantic.income),
         ),
       ],

@@ -19,9 +19,6 @@ class CategoryBreakdown {
 
   /// Porcentaje del total de gastos, redondeado a 1 decimal (0..100).
   final double percentage;
-
-  /// El valor exacto sin redondear, por si hay que pintar la barra.
-  double get ratio => percentage / 100;
 }
 
 /// movements de un mismo día, con sus subtotales.

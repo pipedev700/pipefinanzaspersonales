@@ -37,6 +37,17 @@ void main() {
       expect(validateAmount('$maxAmount').isValid, isTrue);
       expect(validateAmount('${maxAmount + 1}').isValid, isFalse);
     });
+
+    test('el texto del error es el de §15, palabra por palabra', () {
+      // El archivo estaba al 100 % de cobertura sin que nadie afirmara estos
+      // dos mensajes: la rama se ejecutaba, pero el texto que ve el usuario
+      // no estaba fijado. Reescribirlo sin querer no rompía la suite.
+      expect(validateAmount('0').error, 'El monto debe ser mayor a cero');
+      expect(
+        validateAmount('${maxAmount + 1}').error,
+        'El monto es demasiado grande',
+      );
+    });
   });
 
   group('validateDescription', () {
@@ -75,6 +86,14 @@ void main() {
 
     test('rechaza mañana', () {
       expect(validateDate(DateTime(2026, 3, 16), now: now).isValid, isFalse);
+    });
+
+    test('el texto del error es el de §15, palabra por palabra', () {
+      expect(validateDate(null, now: now).error, 'Selecciona una fecha');
+      expect(
+        validateDate(DateTime(2026, 3, 16), now: now).error,
+        'La fecha no puede ser futura',
+      );
     });
   });
 
