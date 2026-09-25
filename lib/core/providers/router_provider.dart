@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/movements/presentation/screens/history_screen.dart';
 import '../../features/movements/presentation/screens/movement_form_screen.dart';
 import '../../shared/widgets/app_scaffold.dart';
 import '../../shared/widgets/app_splash.dart';
 import '../router/app_router.dart';
-import '../router/placeholder_screens.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
@@ -33,7 +33,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: AppRoutes.dashboard,
-                builder: (context, state) => const DashboardPlaceholder(),
+                builder: (context, state) => const DashboardScreen(),
               ),
             ],
           ),

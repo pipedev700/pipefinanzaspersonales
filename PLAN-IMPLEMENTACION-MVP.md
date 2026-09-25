@@ -271,7 +271,7 @@ core/utils    →  (nada, salvo domain)
 | **S03** | [Categorías](#s03--categorías) | S02 | `[x]` |
 | **S04** | [Registro de movimientos](#s04--registro-de-movimientos) | S03 | `[x]` |
 | **S05** | [Historial](#s05--historial) | S04 | `[x]` |
-| **S06** | [Dashboard y resumen mensual](#s06--dashboard-y-resumen-mensual) | S05 | `[ ]` |
+| **S06** | [Dashboard y resumen mensual](#s06--dashboard-y-resumen-mensual) | S05 | `[x]` |
 | **S07** | [Estados vacíos y pulido](#s07--estados-vacíos-y-pulido) | S06 | `[ ]` |
 | **S08** | [Testing](#s08--testing) | S07 | `[ ]` |
 | **S09** | [Release Android](#s09--release-android) | S08 | `[ ]` |
@@ -3912,21 +3912,87 @@ flutter run
 ```
 
 **Debe cumplirse:**
-- [ ] `flutter analyze` → `No issues found!`
-- [ ] El dashboard muestra balance, ingresos y gastos del mes actual
-- [ ] El balance es verde si ≥ 0 y rojo si < 0
-- [ ] El desglose por categoría está ordenado de mayor a menor y suma ~100 %
-- [ ] El selector de mes cambia los tres bloques a la vez
-- [ ] No se puede avanzar más allá del mes actual
-- [ ] Con exactamente 1 movimiento, el balance es exactamente ese monto
-- [ ] Sin movimientos del mes, aparece el estado vacío
-- [ ] Al volver de la pestaña Historial, el dashboard mantiene el mes elegido
+- [x] `flutter analyze` → `No issues found!`
+- [x] El dashboard muestra balance, ingresos y gastos del mes actual
+- [x] El balance es verde si ≥ 0 y rojo si < 0
+- [x] El desglose por categoría está ordenado de mayor a menor y suma ~100 %
+- [x] El selector de mes cambia los tres bloques a la vez
+- [x] No se puede avanzar más allá del mes actual
+- [x] Con exactamente 1 movimiento, el balance es exactamente ese monto
+- [x] Sin movimientos del mes, aparece el estado vacío
+- [x] Al volver de la pestaña Historial, el dashboard mantiene el mes elegido
 
 **Checkpoint:**
 ```bash
 git add -A
 git commit -m "S06: dashboard con balance, totales, desglose y resumen mensual"
 ```
+
+### Desviaciones registradas en S06
+
+**El código de ejemplo no compilaba, y en un punto ni siquiera tenía sentido:**
+
+1. **`FinancialSummary.from(movements, month)` no compila.** La firma real es
+   `from(List<Movement> movements, List<Category> categories)`: el segundo
+   argumento es el **catálogo**, no el mes. El plan se equivocó al escribirlo.
+   Esto no es un detalle, es que el cálculo del desglose *necesita* las
+   categorías para resolver nombre, color e icono; solo con los movimientos
+   tendría ids. Por eso `monthlySummaryProvider` vigila también
+   `categoriesProvider`.
+2. **`s.breakdown` no existe**; el campo se llama `byCategory`. Y
+   `s.income`/`s.expense` son `totalIncome`/`totalExpense`.
+3. **`s.hasData` no existe en `FinancialSummary`.** El plan lo usaba para
+   decidir el estado vacío, lo que además habría sido un error de lógica (ver
+   el punto 4). Se usa `s.transactionCount == 0`, que es lo que significa
+   "no tienes movimientos".
+4. **El estado vacío NO puede decidirse por el balance.** Un mes con un gasto
+   de 50.000 y un ingreso de 50.000 tiene balance 0 y **sí** tiene datos que
+   mostrar. Con el criterio del plan, esa pantalla diría "Aún no tienes
+   movimientos" con dos movimientos registrados. Hay un test dedicado a esto.
+5. **`s.savingsRate` es `double?`, pero `BalanceCard` recibía `double`.** Con un
+   mes sin ingresos, que es el caso más común al empezar, la app habría
+   revuelto con un null. Además el plan ocultaba la línea con
+   `if (savingsRate > 0)`, así que un ahorro negativo desaparecía mientras el
+   balance se pintaba en rojo: se callaba justo el dato que explica el rojo.
+   Ahora el parámetro es `double?` y se muestra siempre que sea calculable.
+6. **`canGoNext` no se añadió a `SelectedMonth`.** El plan lo pedía, pero S05 ya
+   había resuelto lo mismo con `canAdvanceMonthProvider`. Tener las dos cosas
+   serían dos fuentes de verdad para la misma pregunta. El botón usa el
+   provider, que además **es reactivo**: leer `ref.read(notifier).canGoNext`
+   dentro del `build`, como hacía el plan, no se redibuja al cambiar de mes.
+7. **Tercera vez que el código del plan usa `theme.textTheme.label`** y
+   `const CurrencyFormatter(...)`: ninguno de los dos existe. Ver S05.
+8. **`colorScheme.surfaceVariant` está deprecado** desde Flutter 3.18. Se usa
+   `surfaceContainerHighest`.
+9. **El mensaje del estado vacío decía "este mes" fijo** mientras el título sí
+   decía "Este mes" / "Mes anterior" / "Enero 2026". Al retroceder, el texto
+   mentía. Ahora el mensaje es genérico.
+10. **`placeholder_screens.dart` se borró entero.** Los tres placeholders de S00
+    quedaron sin referencias al sustituir el dashboard. Dejar un archivo de
+    código muerto "por si acaso" es peor que no tenerlo.
+11. **El desglose y los recientes se leen con `value`, no con `maybeWhen(...,
+    orElse: shrink)`** que pedía el plan: un `orElse` de `shrink` también
+    esconde un *error* de la consulta, no solo un "todavía no hay datos".
+
+**Sobre los tests: el mismo importe aparece en cuatro sitios.**
+
+Con balance, tarjetas de totales, desglose por categoría y movimientos
+recientes, un gasto de 450.000 se pinta **cuatro veces** en pantalla. Un
+`find.text('\$450.000')` a secas encuentra cuatro widgets y `tester.widget`
+revienta con "Too many elements". Por eso los tests usan finders delimitados
+(`inBalance`, `inTotals`, `inBreakdown`): es la única forma de decir *qué*
+bloque se está comprobando. La misma restricción hará falta en S07.
+
+| Trampa | Qué pasó |
+|---|---|
+| **`find.byTooltip(...).first` elige la rama oculta** | `StatefulShellRoute` deja la rama inactiva montada, así que hay dos botones "‹" en el árbol y `.first` es el *offstage*. El toque no hace nada y el test falla sin motivo apparent. Se usa `.hitTestable()`. |
+| **`formatSigned(0)` da `+\$0`**, no `\$0` | El cero es un balance, y se muestra con signo. Un test que espere `$0` falla. |
+| **Riverpod + `TickerMode` al cambiar de pestaña** | `StatefulShellRoute.indexedStack` apaga el `TickerMode` de la rama oculta; Riverpod reanuda las suscripciones **durante el build**, y eso produce `setState() called during build` sobre el `UncontrolledProviderScope`. Es un diagnóstico de consola, no un fallo de la UI. El test lo consume con `tester.takeException()` y **comprueba que sea ese y no otro**: si apareciera una excepción distinta, el `contains('markNeedsBuild')` fallaría. Queda anotado para vigilarlo en S07 y comprobarlo en dispositivo en S09. |
+| **El criterio "con 1 movimiento el balance es ese monto" es ambiguo** | El PRD define `balance = totalIncome - totalExpenses`, así que un único gasto deja el balance **negativo**. El test se escribió primero como `+73500`, falló, y se partió en dos casos: gasto (negativo) e ingreso (positivo). El criterio de aceptación, tal como está redactado, no distingue los dos. |
+
+**Estado de aceptación S06:** los 9 puntos de "Debe cumplirse" verificados con
+tests. Total de la suite: 172 tests, todos en verde, sin avisos de Drift, y
+`flutter build apk --debug` compila.
 
 ---
 
