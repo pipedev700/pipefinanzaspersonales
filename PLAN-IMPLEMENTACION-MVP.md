@@ -268,7 +268,7 @@ core/utils    →  (nada, salvo domain)
 | **S00** | [Cimientos: estructura, tema, navegación](#s00--ciimientos) | — | `[x]` |
 | **S01** | [Base de datos Drift](#s01--base-de-datos-drift) | S00 | `[x]` |
 | **S02** | [Dominio y cálculos financieros](#s02--dominio-y-cálculos) | S01 | `[x]` |
-| **S03** | [Categorías](#s03--categorías) | S02 | `[ ]` |
+| **S03** | [Categorías](#s03--categorías) | S02 | `[x]` |
 | **S04** | [Registro de movimientos](#s04--registro-de-movimientos) | S03 | `[ ]` |
 | **S05** | [Historial](#s05--historial) | S04 | `[ ]` |
 | **S06** | [Dashboard y resumen mensual](#s06--dashboard-y-resumen-mensual) | S05 | `[ ]` |
@@ -2166,15 +2166,54 @@ flutter analyze
 
 **Debe cumplirse:**
 - [ ] `flutter analyze` → `No issues found!`
-- [ ] Ningún archivo de `presentation/` importa `package:drift` ni `core/database/`
-- [ ] `CategoryIconRegistry.resolve` devuelve `Icons.category` para una clave desconocida (no lanza)
-- [ ] `expenseCategoriesProvider` y `incomeCategoriesProvider` devuelven listas ya ordenadas
+- [x] Ningún archivo de `presentation/` importa `package:drift` ni `core/database/`
+- [x] `CategoryIconRegistry.resolve` devuelve `Icons.category` para una clave desconocida (no lanza)
+- [x] `expenseCategoriesProvider` y `incomeCategoriesProvider` devuelven listas ya ordenadas
 
 **Checkpoint:**
 ```bash
 git add -A
 git commit -m "S03: catálogo de categorías, registro de iconos y providers"
 ```
+
+### Desviaciones registradas en S03
+
+| Tema | El plan decía | Se hizo | Por qué |
+|---|---|---|---|
+| **`categoryByIdProvider`** | `Provider.family<AsyncValue<Category?>, int>` con `maybeWhen` | `Provider.family<Category?, int>` | Devolver un `AsyncValue` anidado dentro de un `AsyncValue` obliga a la UI a desenrollar dos estados. Como el valor viene del mismo `categoriesProvider`, el `null` ya significa "aún no hay datos" o "no existe": un solo nivel. |
+| **Filtro de los providers** | `maybeWhen(data: ..., orElse: ...)` | `AsyncValue.value` + `if (list == null) return const []` | Riverpod 3 cambió la firma de `maybeWhen`; `value` es más directo y cubre loading y error con una sola rama. |
+| **`CategoryIcon` import** | `../../domain/entities/category.dart` | `../../../movements/domain/entities/category.dart` | `Category` vive en `features/movements/` desde S01 (ver desviaciones de S01), no en `features/categories/`. El import del plan no resolvía. |
+| **Test de providers** | `testWidgets` + `ProviderScope` + `read(provider.future)` | `test` + `ProviderContainer` | Ver la nota larga de abajo: la versión del plan **se colgaba**. |
+| **Fakes** | Todos en S08 | `test/helpers/fakes.dart` creado en S03 | El smoke test del plan ya usa `FakeCategoryRepository`, así que hizo falta antes. Se crean por secuencia, no todos de golpe. |
+| **Widget de prueba** | Solo el provider (14 elementos) | 18 tests: 7 de providers + 11 del widget | El widget del icono es código nuevo de UI: si el color, el tamaño o la opacidad se rompen, nadie se entera hasta S08. |
+| **Prueba de la semilla** | No existía | "las 14 categorías tienen icono propio" | `CategoryIconRegistry.resolve` **degrada en silencio** a `Icons.category`. Un typo en un `iconKey` del seed quita el icono a las 14 categorías y ningún otro test falla, porque el fallback es legal por diseño. Este test es el único que lo detecta. |
+
+**Por qué los tests de providers colgan con el enfoque del plan.** El plan
+usaba `await container.read(categoriesProvider.future)`. En un `StreamProvider`
+la propiedad `.future` resuelve con la **siguiente** emisión de la suscripción
+vigente, no con el valor actual. Si el provider ya entregó su valor y el
+repositorio no vuelve a emitir, esa promesa no se resuelve nunca: el test
+queda colgado indefinidamente en vez de fallar. Con `tester.pump()` el problema
+era el mismo, porque el reloj falso no hace avanzar la entrega del stream.
+
+La solución son dos reglas que se aplican a **toda** la suite de providers,
+también en S04, S05 y S06:
+
+1. **Mantener viva la suscripción** con `container.listen(provider, (_, _) {})`
+   antes de leer. Sin un `listen`, `read` sobre un `StreamProvider` puede no
+   dejar la suscripción activa y el valor nunca llega.
+2. **Esperar con tope de intentos**, no con `.future`. El helper
+   `awaitFirstValue` en `test/widgets/category_providers_test.dart` sondea con
+   `Future.delayed(Duration.zero)`, propaga el error si el stream falla y
+   llama a `fail()` tras 100 intentos. Un provider roto produce un mensaje
+   legible en ~1 s, no un cuelgue de 15 min.
+
+Comprobado: la versión anterior colgaba 15 min y el `timeout` del shell la
+mataba sin diagnóstico; con el helper falla en segundos y señala cuál de los
+dos providers se quedó sin datos.
+
+**Estado de aceptación S03:** los cuatro puntos de "Debe cumplirse"
+verificados. Total de la suite: 84 tests, todos en verde.
 
 ---
 
