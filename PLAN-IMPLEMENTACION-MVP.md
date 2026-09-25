@@ -267,7 +267,7 @@ core/utils    →  (nada, salvo domain)
 |---|---|---|---|
 | **S00** | [Cimientos: estructura, tema, navegación](#s00--ciimientos) | — | `[x]` |
 | **S01** | [Base de datos Drift](#s01--base-de-datos-drift) | S00 | `[x]` |
-| **S02** | [Dominio y cálculos financieros](#s02--dominio-y-cálculos) | S01 | `[ ]` |
+| **S02** | [Dominio y cálculos financieros](#s02--dominio-y-cálculos) | S01 | `[x]` |
 | **S03** | [Categorías](#s03--categorías) | S02 | `[ ]` |
 | **S04** | [Registro de movimientos](#s04--registro-de-movimientos) | S03 | `[ ]` |
 | **S05** | [Historial](#s05--historial) | S04 | `[ ]` |
@@ -1918,18 +1918,41 @@ flutter analyze
 ```
 
 **Debe cumplirse:**
-- [ ] `flutter analyze` → `No issues found!`
-- [ ] Ningún archivo de `features/*/domain/` importa `package:flutter` ni `package:drift`
-- [ ] `FinancialCalculator.balance` usa `signedAmount`; no hay `amount` con signo en disco
-- [ ] `breakdownByCategory` devuelve `[]` (no `NaN`) sin gastos
-- [ ] `savingsRate` devuelve `0` (no `NaN`) sin ingresos
-- [ ] `lastMonths(count: 6)` devuelve exactamente 6 elementos, ordenados de más antiguo a más reciente
+- [x] `flutter analyze` → `No issues found!`
+- [x] Ningún archivo de `features/*/domain/` importa `package:flutter` ni `package:drift`
+- [x] `FinancialCalculator.balance` usa `signedAmount`; no hay `amount` con signo en disco
+- [x] `breakdownByCategory` devuelve `[]` (no `NaN`) sin gastos
+- [x] `savingsRate` devuelve `null` (no `NaN`) sin ingresos
+- [x] `lastMonths(count: 6)` devuelve exactamente 6 elementos, ordenados de más antiguo a más reciente
 
 **Checkpoint:**
 ```bash
 git add -A
 git commit -m "S02: entidades de dominio, validadores y cálculos financieros puros"
 ```
+
+### Desviaciones registradas en S02
+
+| Tema | El plan decía | Se hizo | Por qué |
+|---|---|---|---|
+| **`savingsRate` sin ingresos** | "devuelve `0` (no `NaN`)" | Devuelve **`null`** | `0` es un valor falso: la UI mostraría "Ahorro 0%" cuando en realidad no se puede calcular. Con `null` el widget decide si pinta la fila o no. Es un `double?`, no un `double`. |
+| **Dónde viven los value objects** | `financial_summary.dart` | `financial_values.dart` aparte | `FinancialSummary.from` necesita `FinancialCalculator` y la calculadora necesita `CategoryBreakdown` / `DailyGroup` / `MonthlyBar`. Con todo en un archivo, el import es circular. Separarlos deja el ciclo explícito y un archivo por responsabilidad. |
+| **`FinancialSummary.from`** | Calculaba el desglose | Pide también `List<Category>` | Sin las categorías solo se conoce el id: no hay nombre, color ni icono. El desglose es medio useless sin ellas. |
+| **Tests de S02** | En S08 | Escritos en S02 (45 tests) | Son funciones puras: probarlas cuesta segundos y es la única forma de verificar que la aritmética del balance, los porcentajes y la ventana de meses es correcta. S08 queda solo con fakes y widgets. |
+| **`lastMonths` orden** | "de más antiguo a más reciente" | Corregido a cronológico | La primera implementación restaba `i` al mes de referencia y salía al revés (nuevo → viejo). Un gráfico de barras leído de izquierda a derecha necesita lo contrario. Lo detectó el test de frontera de año. |
+| **`CurrencyFormatter` `const`** | `static const _currency` | `final` + `NumberFormat` cacheado | Construir un `NumberFormat` por llamada es caro en una lista de movimientos. Se cachea en un `late final` por instancia, lo que obliga a quitar `const`. |
+| **`validateAmount` con signo** | `replaceAll(RegExp(r'[^0-9]'), '')` | Rechaza el signo explícitamente | Ese regex converts `-5` en `5` y lo daba por **válido**, contradiciendo la regla de §15. Ahora se valida el formato antes de convertir. |
+| **`DailyGroup.movements`** | `List<Movement>` | Igual, pero **no** `List<dynamic>` | `dynamic` habría roto todo el tipado del historial en S05. |
+
+**Restricción heredada de S00:** `core/utils/` mezcla código puro y código con
+Flutter. `currency_formatter.dart` y `validators.dart` son puros y se testean sin
+widget; **`date_utils.dart` no lo es**, porque `monthRange` devuelve un
+`DateTimeRange` de material. Consecuencia: `AppDateUtils.monthRange` solo se
+puede llamar desde `presentation`, nunca desde `domain` ni desde `data`. Quien
+necesite el rango para consultar la base debe usar `date.start` / `date.end`.
+
+**Estado de aceptación S02:** los seis puntos de "Debe cumplirse" verificados,
+más 45 tests nuevos. Total de la suite: 66 tests, todos en verde.
 
 ---
 
