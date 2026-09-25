@@ -2,9 +2,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../categories/presentation/providers/category_providers.dart';
 import '../../../movements/domain/entities/movement.dart';
+import '../../../movements/domain/financial_calculator.dart';
 import '../../../movements/domain/financial_summary.dart';
 import '../../../movements/domain/financial_values.dart';
 import '../../../movements/presentation/providers/history_providers.dart';
+import '../../../../core/providers/repository_providers.dart';
 
 /// §13 — Resumen del mes: totales, balance, desglose y tasa de ahorro.
 ///
@@ -40,4 +42,24 @@ final breakdownProvider = Provider<AsyncValue<List<CategoryBreakdown>>>((ref) {
   return ref.watch(
     monthlySummaryProvider,
   ).whenData((summary) => summary.byCategory);
+});
+
+/// Todos los movimientos, no solo los del mes visible. El gráfico de 6 meses
+/// necesita la serie completa.
+final allMovementsProvider = StreamProvider<List<Movement>>(
+  (ref) => ref.watch(movementRepositoryProvider).watchAll(),
+);
+
+/// S07 — Últimos 6 meses para el gráfico de barras.
+///
+/// La ventana termina en el mes **seleccionado**, no en el mes actual: si se
+/// retrocede a marzo, el gráfico debe enseñar febrero–marzo, no stretching
+/// hasta hoy. Además `lastMonths` necesita un mes de referencia explícito, así
+/// que sin esto el eje no tendría dónde anclarse.
+final lastSixMonthsProvider = Provider<AsyncValue<List<MonthlyBar>>>((ref) {
+  const calc = FinancialCalculator();
+  final month = ref.watch(selectedMonthProvider);
+  return ref.watch(
+    allMovementsProvider,
+  ).whenData((all) => calc.lastMonths(all, 6, month));
 });

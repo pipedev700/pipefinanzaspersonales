@@ -7,8 +7,10 @@ import 'package:pipefinanzaspersonales/core/theme/app_theme.dart';
 import 'package:pipefinanzaspersonales/core/theme/theme_extensions.dart';
 import 'package:pipefinanzaspersonales/features/dashboard/presentation/widgets/balance_card.dart';
 import 'package:pipefinanzaspersonales/features/dashboard/presentation/widgets/category_breakdown.dart';
+import 'package:pipefinanzaspersonales/features/dashboard/presentation/widgets/monthly_bars.dart';
 import 'package:pipefinanzaspersonales/features/dashboard/presentation/widgets/totals_row.dart';
 import 'package:pipefinanzaspersonales/features/movements/domain/entities/movement_type.dart';
+import 'package:pipefinanzaspersonales/features/movements/domain/financial_values.dart';
 import 'package:pipefinanzaspersonales/features/movements/presentation/widgets/movement_tile.dart';
 
 import '../helpers/fakes.dart';
@@ -95,8 +97,10 @@ void main() {
       await openDashboard(tester);
 
       expect(find.text('Balance · ${_monthName(month.month)} ${month.year}'), findsOneWidget);
-      expect(find.text('Ingresos'), findsOneWidget);
-      expect(find.text('Gastos'), findsOneWidget);
+      // Delimitado a las tarjetas: la leyenda del gráfico de 6 meses también
+      // dice "Ingresos" y "Gastos".
+      expect(inTotals('Ingresos'), findsOneWidget);
+      expect(inTotals('Gastos'), findsOneWidget);
       // El subtotal de gastos aparece en su tarjeta, no solo en el balance.
       expect(inTotals('\$2.000.000'), findsOneWidget);
       expect(inTotals('\$310.000'), findsOneWidget);
@@ -317,6 +321,177 @@ void main() {
         findsOneWidget,
       );
       expect(inBalance('-\$7.000'), findsOneWidget);
+    });
+  });
+
+  group('gráfico de 6 meses', () {
+    /// Las barras son los únicos `Tooltip` del gráfico (los valores de cero no
+    /// lo llevan) y se localizan por **tamaño renderizado**, no por
+    /// `Container.constraints`: `Container(width:, height:)` mete un
+    /// `ConstrainedBox` interno y deja `constraints` en null.
+    List<double> barHeights(WidgetTester tester) {
+      return tester
+          .widgetList<Tooltip>(
+            find.descendant(
+              of: find.byType(MonthlyBars),
+              matching: find.byType(Tooltip),
+            ),
+          )
+          .map((t) => tester.getSize(find.byWidget(t)).height)
+          .toList(growable: false);
+    }
+
+    testWidgets('todas las barras comparten una escala', (tester) async {
+      useTallScreen(tester);
+      movements.emit([
+        buildMovement(id: 1, amount: 1000000, date: DateTime(month.year, month.month, 2)),
+        buildMovement(id: 2, amount: 100000, date: DateTime(month.year, month.month - 1, 2)),
+      ]);
+      await openDashboard(tester);
+
+      expect(find.text('Últimos 6 meses'), findsOneWidget);
+      final heights = barHeights(tester);
+      expect(heights, hasLength(2));
+      // La mayor es la del mes con 1.000.000 y la otra es un décimo. Si cada
+      // barra midiera contra su propio valor, las dos serían iguales.
+      final tall = heights.reduce((a, b) => a > b ? a : b);
+      final short = heights.reduce((a, b) => a < b ? a : b);
+      expect(tall, greaterThan(100));
+      expect(
+        tall / short,
+        closeTo(10, 0.5),
+        reason: 'proporción 10:1 entre los importes',
+      );
+    });
+
+    testWidgets('un valor muy pequeño se ve igual', (tester) async {
+      useTallScreen(tester);
+      // 1.000 contra 1.000.000 da un 0,1 %: sin el mínimo de 2 px esa barra
+      // desaparecería y el mes parecería sin movimientos. Hace falta un
+      // ingreso: las barras de valor cero no llevan `Tooltip`.
+      movements.emit([
+        buildMovement(
+          id: 1,
+          amount: 1000000,
+          date: DateTime(month.year, month.month, 2),
+          type: MovementType.income,
+        ),
+        buildMovement(id: 2, amount: 1000, date: DateTime(month.year, month.month, 2)),
+      ]);
+      await openDashboard(tester);
+
+      final heights = barHeights(tester);
+      expect(heights, hasLength(2));
+      expect(
+        heights.where((h) => h < 5),
+        hasLength(1),
+        reason: 'barra del gasto pequeño',
+      );
+      expect(heights.reduce((a, b) => a < b ? a : b), greaterThanOrEqualTo(2));
+    });
+
+    testWidgets('las barras llevan el importe en el tooltip', (tester) async {
+      useTallScreen(tester);
+      movements.emit([
+        buildMovement(id: 1, amount: 250000, date: DateTime(month.year, month.month, 2)),
+      ]);
+      await openDashboard(tester);
+
+      expect(
+        find.descendant(
+          of: find.byType(MonthlyBars),
+          matching: find.byTooltip('\$250.000'),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('se omite si la ventana entera está vacía', (tester) async {
+      // Se monta el widget suelto: desde el dashboard es imposible llegar con
+      // seis meses a cero, porque si el mes visible no tiene movimientos se
+      // muestra el estado vacío en su lugar. La guarda es defensiva.
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light,
+          home: Scaffold(
+            body: MonthlyBars(
+              bars: List.generate(
+                6,
+                (i) => MonthlyBar(month: DateTime(2026, i + 1), income: 0, expense: 0),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(MonthlyBars), findsOneWidget);
+      expect(find.text('Últimos 6 meses'), findsNothing);
+    });
+  });
+
+  group('accesibilidad', () {
+    testWidgets('el balance se anuncia con su signo, no solo con color', (
+      tester,
+    ) async {
+      useTallScreen(tester);
+      movements.emit([
+        buildMovement(id: 1, amount: 450000, date: DateTime(month.year, month.month, 2)),
+      ]);
+      await openDashboard(tester);
+
+      final node = tester.getSemantics(find.byType(BalanceCard));
+      expect(node.label, contains('Balance del mes'));
+      expect(node.value, contains('Negativo'));
+      expect(node.value, contains('-\$450.000'));
+    });
+
+    testWidgets('sin desbordes con la fuente a 1.3', (tester) async {
+      useTallScreen(tester);
+      tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      movements.emit([
+        for (var i = 1; i <= 6; i++)
+          buildMovement(
+            id: i,
+            amount: i * 12000,
+            date: DateTime(month.year, month.month, i),
+            categoryId: i.isEven ? 2 : 1,
+            description: 'Movimiento con descripción larga $i',
+          ),
+        buildMovement(
+          id: 7,
+          amount: 1500000,
+          date: DateTime(month.year, month.month, 1),
+          type: MovementType.income,
+        ),
+      ]);
+      await openDashboard(tester);
+
+      // Cualquier `RenderFlex overflowed` durante este pump habría marcado el
+      // test como fallido; se comprueba además que no quedó ninguno pendiente.
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('sin desbordes con la fuente a 1.3 en el historial', (
+      tester,
+    ) async {
+      useTallScreen(tester);
+      tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      movements.emit([
+        for (var i = 1; i <= 4; i++)
+          buildMovement(
+            id: i,
+            amount: i * 90000,
+            date: DateTime(month.year, month.month, i),
+            description: 'Una descripción bastante larga para forzar el corte',
+          ),
+      ]);
+      await openDashboard(tester);
+      await tester.tap(find.text('Historial').last);
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
     });
   });
 

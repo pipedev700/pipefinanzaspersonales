@@ -36,6 +36,14 @@ const _kShortMonths = <String>[
 abstract final class AppDateUtils {
   static String monthName(int month) => _kMonthNames[month - 1];
 
+  /// Abrviatura de 3 letras para el eje del gráfico: "ene", "feb"…
+  ///
+  /// Vive aquí y no como `monthName(m).substring(0, 3)` en el widget: las
+  /// abreviaturas en español no siempre son las tres primeras letras del
+  /// nombre ("Septiembre" → "Sep"), y duplicar el criterio en dos sitios es
+  /// la forma corta de que se desincronicen.
+  static String shortMonthName(int month) => _kShortMonths[month - 1];
+
   /// §12 — "13 ene 2026"
   static String formatShort(DateTime date) =>
       '${date.day} ${_kShortMonths[date.month - 1]} ${date.year}';

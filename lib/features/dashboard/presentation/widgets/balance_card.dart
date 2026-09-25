@@ -41,10 +41,19 @@ class BalanceCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
-            Text(
-              CurrencyFormatter.cop.formatSigned(balance),
-              style: AppTypography.display.copyWith(
-                color: isPositive ? semantic.income : semantic.expense,
+            // §35 — El color solo no se anuncia: un lector de pantalla tiene
+            // que oír el valor con su signo, que es lo que distingue un
+            // ingreso de un gasto.
+            Semantics(
+              label: 'Balance del mes',
+              value:
+                  '${isPositive ? 'Positivo' : 'Negativo'}, '
+                  '${CurrencyFormatter.cop.formatSigned(balance)}',
+              child: Text(
+                CurrencyFormatter.cop.formatSigned(balance),
+                style: AppTypography.display.copyWith(
+                  color: isPositive ? semantic.income : semantic.expense,
+                ),
               ),
             ),
             // Se muestra también en negativo: si el balance ya está en rojo,

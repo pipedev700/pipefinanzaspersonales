@@ -272,7 +272,7 @@ core/utils    →  (nada, salvo domain)
 | **S04** | [Registro de movimientos](#s04--registro-de-movimientos) | S03 | `[x]` |
 | **S05** | [Historial](#s05--historial) | S04 | `[x]` |
 | **S06** | [Dashboard y resumen mensual](#s06--dashboard-y-resumen-mensual) | S05 | `[x]` |
-| **S07** | [Estados vacíos y pulido](#s07--estados-vacíos-y-pulido) | S06 | `[ ]` |
+| **S07** | [Estados vacíos y pulido](#s07--estados-vacíos-y-pulido) | S06 | `[x]` |
 | **S08** | [Testing](#s08--testing) | S07 | `[ ]` |
 | **S09** | [Release Android](#s09--release-android) | S08 | `[ ]` |
 
@@ -4257,17 +4257,107 @@ flutter run
 ```
 
 **Debe cumplirse:**
-- [ ] `flutter analyze` → `No issues found!`
-- [ ] Los tres estados vacíos de la tabla de S07 se ven correctamente
-- [ ] El gráfico de 6 meses aparece con barras visibles, incluso con valores pequeños
-- [ ] Ningún hex literal fuera de `AppColors` y del seed
-- [ ] Sin desbordes con fuente grande
+- [x] `flutter analyze` → `No issues found!`
+- [x] Los estados vacíos de la tabla de S07 se ven correctamente — **dos de
+      tres**: el de "Sin resultados" no aplica, la app no tiene buscador ni
+      filtros (ver desviaciones)
+- [x] El gráfico de 6 meses aparece con barras visibles, incluso con valores pequeños
+- [x] Ningún hex literal fuera de `AppColors` y del seed
+- [x] Sin desbordes con fuente grande
 
 **Checkpoint:**
 ```bash
 git add -A
 git commit -m "S07: estados vacíos, gráfico de 6 meses y pulido visual"
 ```
+
+### Desviaciones registradas en S07
+
+**El gráfico de barras tenía la altura mal calculada.** El ejemplo del plan
+usaba `(14 * ratio).clamp(2.0, 126.0)` dentro de un `SizedBox` de 140 px: como
+`ratio <= 1`, la barra más alta medía **14 px** en un gráfico de 140, y el
+`clamp` a 126 era inalcanzable. Todas las barras habrían sido una franja
+diminuta pegada al eje. Ahora la altura sale de una constante
+(`kBarAreaHeight = 112`) que representa el espacio real disponible, y hay un
+test que mide el tamaño renderizado y comprueba que un mes con 1.000.000
+midió **diez veces** lo que el mes con 100.000. Un gráfico comparativo que no
+escala no informa de nada.
+
+**`lastMonths` necesita un mes de referencia y el plan no lo pasaba.** La firma
+real es `lastMonths(movements, count, ref)`; el plan escribía
+`lastMonths(all, count: 6)`, sin referencia, y además el parámetro se llama
+`count` en posición, no `count:`. Más importante: **el plan no decidía si la
+ventana terminaba en el mes actual o en el seleccionado**. Termina en el
+seleccionado, porque si se retrocede a marzo el gráfico debe enseñar
+febrero–marzo, no estirarse hasta hoy. Si hiciera lo contrario, cambiar de
+mes en el historial mostraría meses que no corresponden a lo seleccionado.
+
+**`lastSixMonthsProvider` se rehízo como provider derivado.** El plan lo
+escribía con `watchAll().asyncMap(...).then(...).onError(...)`, que pierde la
+pila de errores real (`StackTrace.current` no es el del fallo), mezcla dos
+`AsyncValue` y —lo más importante— **no es testeable con el patrón de
+`ProviderContainer` + `awaitFirstValue`** que usa el resto de la suite desde
+S03. Ahora hay un `allMovementsProvider` (`StreamProvider`) y
+`lastSixMonthsProvider` se apoya en él con `whenData`, igual que el resto. Tres
+tests nuevos cubren la ventana, su desplazamiento con el filtro y que lea
+meses anteriores al filtro (si leyera solo el mes visible, el gráfico sería siempre
+de una sola barra).
+
+**`AppDateUtils.monthName(m).substring(0, 3)` se sustituyó por
+`shortMonthName(m)`.** El atajo funciona por casualidad en español, pero
+duplicaba el criterio de abreviatura en un segundo sitio. `_kShortMonths` ya
+existía en `date_utils.dart` y era privado; se expone.
+
+**El registro central de estados vacíos no se hizo, y hay un motivo.** El plan
+proponía `EmptyStates` con entradas `const` de título y mensaje fijos, pero su
+propia tabla exige "Este mes" / "Mes anterior" / "Enero 2026" según el mes
+visible: **un `const` no puede produzir eso**. Con dos usos, el registro añade
+una capa de indirección sin eliminar duplicación real; `EmptyState` ya es el
+punto único de lo visual. Se dejó así a propósito, no por olvido.
+
+**El tercer estado vacío de la tabla no existe y no se implementó.** Es
+"Sin resultados" / "No hay movimientos que coincidan." / "Limpiar filtros" con
+ícono `search_off`. La app **no tiene buscador ni filtros**: el historial solo
+tiene el selector de mes. Ese estado es inalcanzable, e inventar una función
+de búsqueda para poder mostrar un estado vacío sería ampliar el alcance sin
+pedido. Queda como decisión pendiente, no como hueco.
+
+**El gráfico no se ve cuando el mes visible está vacío.** El estado vacío de
+S06 sustituye a todo el cuerpo del dashboard, y el gráfico va dentro. Es
+consistente con el criterio de aceptación ya verificado en S06, pero significa
+que un usuario con cinco meses de historia y el mes en curso vacío no ve el
+gráfico. Si se quiere, en S09 se puede decidir si el gráfico sobrevive al
+estado vacío.
+
+**`CurrencyFormatter(CurrencyCode.cop)` dentro de `_Bar`** (cuarta vez que el
+código del plan crea un formateador): no es `const` y además se creaba una
+instancia **por barra y por rebuild**, con su `NumberFormat` interno. Ahora usa
+la instancia compartida `CurrencyFormatter.cop`.
+
+### Sobre los tests de esta etapa
+
+| Trampa | Qué pasó |
+|---|---|
+| **`Container(width:, height:)` deja `constraints` en null** | Los parámetros `width`/`height` de `Container` se traducen a un `ConstrainedBox` **interno**, no al campo `constraints` del widget. Los primeros tests del gráfico medían `null` y no comparaban nada. Ahora se localizan las barras por su `Tooltip` (las de valor cero no lo llevan) y se mide el tamaño con `tester.getSize()`. |
+| **La leyenda "Ingresos"/"Gastos" choca con las tarjetas de totales** | La prueba de que las dos tarjetas se pintan pasó a estar verde y luego se rompió al añadir el gráfico: `find.text('Ingresos')` encontraba dos. Es exactamente el problema de S06 otra vez, y por eso los finders van delimitados. |
+| **El orden de las barras es cronológico, no por importe** | `lastMonths` devuelve de más antiguo a más reciente, así que el primer `Tooltip` puede ser la barra **pequeña**. Los tests comparan con `reduce(max)` y `reduce(min)`, no con `first`/`last`. |
+| **`textScaleFactorTestValue` sí se puede testear** | La fuente grande no necesita un dispositivo: `tester.platformDispatcher.textScaleFactorTestValue = 1.3` y luego `tester.takeException()` falla si hubo un `RenderFlex overflowed`. Hay tests a 1.3 en el dashboard y en el historial, con descripciones largas y muchos movimientos. |
+| **La semántica del balance se comprueba con `getSemantics`** | `expect(node.value, contains('-\$450.000'))` verifica que un lector de pantalla oiga el signo, no solo que el color sea rojo. |
+
+**Estado de aceptación S07:**
+
+- [x] `flutter analyze` → `No issues found!`
+- [x] Los estados vacíos del dashboard y del historial se ven correctamente
+      (el tercero de la tabla no aplica: no hay filtros, ver arriba)
+- [x] El gráfico de 6 meses aparece con barras visibles, incluso con valores
+      pequeños (test del mínimo de 2 px)
+- [x] Ningún hex literal fuera de `AppColors` y del seed
+- [x] Sin desbordes con fuente a 1.3
+- [x] Todos los botones de icono tienen `tooltip`
+- [x] El `Semantics` del balance anuncia el valor con signo
+
+Total de la suite: 182 tests, todos en verde, sin avisos de Drift, y
+`flutter build apk --debug` compila.
 
 ---
 

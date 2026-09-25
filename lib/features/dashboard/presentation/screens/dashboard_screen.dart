@@ -9,6 +9,7 @@ import '../providers/dashboard_providers.dart';
 import '../widgets/balance_card.dart';
 import '../widgets/category_breakdown.dart';
 import '../widgets/month_selector.dart';
+import '../widgets/monthly_bars.dart';
 import '../widgets/recent_movements.dart';
 import '../widgets/totals_row.dart';
 
@@ -23,6 +24,7 @@ class DashboardScreen extends ConsumerWidget {
     final summary = ref.watch(monthlySummaryProvider);
     final recent = ref.watch(recentMovementsProvider);
     final breakdown = ref.watch(breakdownProvider);
+    final bars = ref.watch(lastSixMonthsProvider);
     // Provider y no `notifier.canGoNext` leído en el `build`: leer el notifier
     // no es reactivo, así que el botón seguiría habilitado tras cambiar de
     // mes desde el historial.
@@ -68,6 +70,10 @@ class DashboardScreen extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.md),
                 TotalsRow(income: s.totalIncome, expense: s.totalExpense),
                 const SizedBox(height: AppSpacing.md),
+                if (bars.value?.isNotEmpty ?? false) ...[
+                  MonthlyBars(bars: bars.value!),
+                  const SizedBox(height: AppSpacing.md),
+                ],
                 // `value` en vez de `maybeWhen`: dentro de `data:` del resumen
                 // estos dos ya están resueltos, y un `orElse: shrink()`
                 // escondería también un error de la consulta de categorías.

@@ -291,6 +291,75 @@ void main() {
     expect(s.totalExpense, 3000);
   });
 
+  group('lastSixMonthsProvider', () {
+    test('devuelve 6 meses terminando en el mes seleccionado', () async {
+      final movements = FakeMovementRepository([
+        buildMovement(id: 1, amount: 50000, date: DateTime(month.year, month.month, 3)),
+        buildMovement(
+          id: 2,
+          amount: 900000,
+          date: DateTime(month.year, month.month - 2, 10),
+          type: MovementType.income,
+        ),
+      ]);
+      final container = makeContainer(movements, FakeCategoryRepository());
+      container.listen(allMovementsProvider, (_, _) {});
+
+      final bars = await awaitFirstValue(
+        () => container.read(lastSixMonthsProvider),
+        description: 'lastSixMonthsProvider',
+      );
+
+      expect(bars, hasLength(6));
+      expect(bars.last.month, month, reason: 'la ventana termina en el mes elegido');
+      expect(bars[3].month, DateTime(month.year, month.month - 2));
+      expect(bars[3].income, 900000);
+      expect(bars.last.expense, 50000);
+      // Un mes sin movimientos debe venir con ceros, no desaparecer: si no,
+      // el gráfico saltaría de un mes con datos al siguiente.
+      expect(bars.first.income, 0);
+      expect(bars.first.expense, 0);
+    });
+
+    test('la ventana se mueve con el filtro mensual', () async {
+      final movements = FakeMovementRepository([
+        buildMovement(id: 1, amount: 50000, date: DateTime(month.year, month.month, 3)),
+      ]);
+      final container = makeContainer(movements, FakeCategoryRepository());
+      container.listen(allMovementsProvider, (_, _) {});
+      final now = await awaitFirstValue(
+        () => container.read(lastSixMonthsProvider),
+      );
+      expect(now.last.month, month);
+
+      container.read(selectedMonthProvider.notifier).previous();
+
+      final previous = await awaitValueWhere(
+        () => container.read(lastSixMonthsProvider),
+        (b) => b.last.month != month,
+        description: 'el gráfico del mes anterior',
+      );
+      expect(previous.last.month, DateTime(month.year, month.month - 1));
+    });
+
+    test('incluye movimientos de meses anteriores al filtro', () async {
+      // El gráfico es de 6 meses: leer solo el mes visible lo dejaría vacío.
+      final old = DateTime(month.year, month.month - 4, 5);
+      final movements = FakeMovementRepository([
+        buildMovement(id: 1, amount: 50000, date: DateTime(month.year, month.month, 3)),
+        buildMovement(id: 2, amount: 777000, date: old),
+      ]);
+      final container = makeContainer(movements, FakeCategoryRepository());
+      container.listen(allMovementsProvider, (_, _) {});
+
+      final bars = await awaitFirstValue(
+        () => container.read(lastSixMonthsProvider),
+      );
+
+      expect(bars[1].expense, 777000);
+    });
+  });
+
   test('el desglose hereda el error del resumen', () async {
     final movements = FakeMovementRepository();
     final container = makeContainer(movements, FakeCategoryRepository());
