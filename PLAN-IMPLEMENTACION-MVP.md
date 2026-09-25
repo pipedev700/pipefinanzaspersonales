@@ -274,7 +274,7 @@ core/utils    →  (nada, salvo domain)
 | **S06** | [Dashboard y resumen mensual](#s06--dashboard-y-resumen-mensual) | S05 | `[x]` |
 | **S07** | [Estados vacíos y pulido](#s07--estados-vacíos-y-pulido) | S06 | `[x]` |
 | **S08** | [Testing](#s08--testing) | S07 | `[x]` |
-| **S09** | [Release Android](#s09--release-android) | S08 | `[ ]` |
+| **S09** | [Release Android](#s09--release-android) | S08 | `[x]` |
 
 ```text
 S00 ──► S01 ──► S02 ──► S03 ──► S04 ──► S05 ──► S06 ──► S07 ──► S08 ──► S09
@@ -933,7 +933,7 @@ flutter run
 ```
 
 **Debe cumplirse:**
-- [ ] `flutter analyze` → `No issues found!`
+- [x] `flutter analyze` → `No issues found!`
 - [ ] `flutter build apk --debug` → APK generado
 - [ ] La app arranca, muestra el splash con fondo `#F8FAFC` y el logo
 - [ ] `/` y `/historial` muestran su placeholder
@@ -1364,7 +1364,7 @@ flutter analyze
 
 **Debe cumplirse:**
 - [ ] `app_database.g.dart` y `daos.g.dart` se generan sin error
-- [ ] `flutter analyze` → `No issues found!`
+- [x] `flutter analyze` → `No issues found!`
 - [ ] La app arranca sin excepción
 - [ ] El archivo `pipe_finanzas.sqlite` aparece en el directorio de la app
 - [ ] Reabrir la app **no duplica** las 14 categorías (idempotencia de la semilla)
@@ -2165,7 +2165,7 @@ flutter analyze
 ```
 
 **Debe cumplirse:**
-- [ ] `flutter analyze` → `No issues found!`
+- [x] `flutter analyze` → `No issues found!`
 - [x] Ningún archivo de `presentation/` importa `package:drift` ni `core/database/`
 - [x] `CategoryIconRegistry.resolve` devuelve `Icons.category` para una clave desconocida (no lanza)
 - [x] `expenseCategoriesProvider` y `incomeCategoriesProvider` devuelven listas ya ordenadas
@@ -4998,7 +4998,7 @@ arriba.
 
 **Estado de aceptación S08:**
 
-- [x] `flutter test` termina en verde — **235 tests**
+- [x] `flutter test` termina en verde — **237 tests**
 - [x] Cobertura de `financial_calculator.dart` ≥ 90 % en las ramas de negocio
       — 100 %, y también sus 8 grupos de pruebas de §33
 - [x] `validators_test.dart` cubre los 4 mensajes de error de §15 — son
@@ -5178,6 +5178,139 @@ git add -A
 git commit -m "S09: package ID, release Android y verificación de privacidad"
 ```
 
+### Lo que se hizo en S09
+
+Cambios reales en el repositorio, todos verificados sobre el APK compilado:
+
+| Cambio | Verificación |
+|---|---|
+| `applicationId` y `namespace` → `com.pipefinanzas.app` | `aapt2 dump badging` → `package: name='com.pipefinanzas.app'` |
+| `MainActivity.kt` movido a `com/pipefinanzas/app/` con el `package` nuevo | `find android -name "*.kt"` → una sola ruta, y el directorio `com/example` eliminado |
+| `android:label` → `@string/app_name` + `strings.xml` nuevo | `aapt2` → `application-label:'Pipe Finanzas'` |
+| `versionCode` / `versionName` desde `pubspec.yaml` | `aapt2` → `versionCode='1' versionName='1.0.0'` |
+| Comentados los dos `TODO` de la plantilla de Flutter | `grep TODO lib/ android/app` → ninguno |
+
+**`versionCode` y `versionName` no se escribieron en `build.gradle.kts`.** Ya
+estaban enlazados a `flutter.versionCode` / `flutter.versionName`, que leen
+`pubspec.yaml` (`version: 1.0.0+1`). El paso 2 del plan propone
+`versionCode = 1` a mano; hacerlo habría creado un segundo sitio donde vive
+la versión, que es exactamente la clase de desincronización que se lleva por
+mantener la regla y el valor en dos ficheros distintos. Se comprobó en el APK
+que el resultado es el que el plan pedía.
+
+**La etiqueta se externalizó a `strings.xml`.** Estaba hardcodeada en el
+manifest, lo que funciona pero deja el nombre de la app en un sitio que no es
+el habitual. Ahora es el único sitio que hay que tocar para localizarla.
+
+**No se añadió nada a `.gitignore`.** Se iba a añadir reglas para
+`key.properties` y `*.jks`, pero `android/.gitignore` ya las tenía, con el
+enlace de referencia de Flutter. Duplicar reglas de secretos en dos ficheros
+es la forma de que una de las dos se quede desactualizada sin que nadie se
+entere. Comprobado con `git check-ignore`: la clave queda cubierta en las rutas
+que importan —`android/key.properties` (la que lee Flutter) y cualquier
+`*.jks` bajo `android/`—. Un `key.properties` en la raíz del repositorio *no*
+queda cubierto, y no se ha movido allí: si algún día se usara, la regla
+tendría que moverse con él.
+
+### El manifest de release tiene un permiso, y no es de los nuestros
+
+El paso 5 dice "exactamente un permiso" y muestra un manifiesto sin ninguno.
+El APK real tiene **uno**:
+
+```
+uses-permission: name='com.pipefinanzas.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
+```
+
+Lo inyecta AndroidX, no el código de la app, y es de firma propia: **no le
+concede nada a la aplicación**, sirve para que otras apps no le envíen
+difusiones a sus receptores. No es de red ni de ubicación.
+
+Lo que sí importa, verificado con `aapt2` sobre el APK binario y no sobre el
+fuente — que es la distinción que pedía el plan:
+
+- **Cero `INTERNET`.** Ni en el manifiesto fuente de release, ni en ninguno de
+  los cinco manifestos intermedios fusionados, ni en el APK. Los permisos
+  `INTERNET` que sí existen están solo en `src/debug/` y `src/profile/`, que
+  son para el hot reload, y no entran en el build de release.
+- Sin `ACCESS_NETWORK_STATE`, sin ubicación, sin almacenamiento externo.
+
+Que no haya `INTERNET` no es un adorno: es lo que **impide** que la app abra
+un socket en Android, diga lo que diga el código. La garantía de §36 no
+depende de que no llamemos a ninguna API de red, sino de que el sistema
+rechace la llamada.
+
+### "Cero dependencias de red", con la precisión que merece
+
+La afirmación es cierta **para la app que se distribuye**, y el árbol de
+dependencias necesita una aclaración, porque `pubspec.lock` sí contiene
+`web_socket_channel`, `http_multi_server` y `http_parser`. Vienen **solo** de
+`build_runner`, una `dev_dependency` usada para generar código, y no entran en
+el APK. El árbol de runtime es: `flutter`, `cupertino_icons`,
+`flutter_riverpod`, `go_router`, `drift`, `drift_flutter`, `intl`. Ninguno
+habla red. Por eso la lista es de 114 paquetes resueltos pero solo 7 son
+reales.
+
+### El icono ya era el de marca: una corrección
+
+Al preguntar por el icono se dijo que el icono del lanzador era el de Flutter
+por defecto y que haría falta añadir `flutter_launcher_icons`, que el plan
+prohíbe sin aprobación. **Era falso en las dos partes**, y la comprobación lo
+dejó claro:
+
+- `flutter_launcher_icons` **ya estaba** en las `dev_dependencies`, con la
+  configuración completa apuntando a `assets/images/app_icon.png`.
+- El repositorio **ya tenía** los assets de marca: `app_icon.png`,
+  `app_icon_foreground.png`, `logo_mark.png`, `logo_horizontal.png`,
+  `logopipefinanzas.jpg`.
+- El icono instalado es el asset de marca: el fingerprint de
+  `drawable-xxxhdpi/ic_launcher_foreground.png` (432×432) es **idéntico** al
+  de `assets/images/app_icon_foreground.png` (1024×1024), y
+  `ic_launcher_background` vale `#E9E5DB`, el crema que pide la configuración.
+
+La herramienta se había ejecutado en S00. El criterio de aceptación "el icono
+y el nombre son los de Pipe Finanzas" **ya se cumplía**; no había nada
+pendiente. Se corrigió la premisa antes de escribir nada, y por eso no queda
+como punto abierto.
+
+### Lo que queda pendiente, y por qué
+
+Dos cosas, y ninguna se puede cerrar desde aquí:
+
+1. **Instalar el APK y recorrer el flujo (§11, 9 puntos).** No hay ningún
+   dispositivo Android ni emulador conectado: `flutter devices` solo ve Edge
+   (web). Requiere una persona con el móvil en la mano, y dos de esos puntos
+   —persistencia al reabrir y modo avión— no se pueden simular.
+2. **Firma de publicación.** Por decisión tomada en S09, el release se firma
+   con la clave de debug. El APK **se instala y se prueba**, pero no es
+   publicable: la clave de debug es pública y cualquiera puede producir un
+   APK que falsifique esta app. El procedimiento para generar la clave real
+   quedó escrito en el propio `build.gradle.kts`, junto al `signingConfig`.
+
+El APK pesa 58 MB porque `flutter build apk` genera un APK **gordo** con las
+tres ABIs (`arm64-v8a`, `armeabi-v7a`, `x86_64`): el motor Flutter y
+`libsqlite3` van tripled. Con `--split-per-abi` cada APK queda en torno a
+20 MB. No se cambió porque el tamaño no está en los criterios de aceptación y
+afecta a cómo se distribuye, que es una decisión de publicación.
+
+Plataformas fuera de Android (`ios/`, `macos/`, `linux/`) siguen con el
+`com.example.pipefinanzaspersonales` de la plantilla. S09 es *Release
+Android* y el PRD no pide iOS ni escritorio, así que no se han tocado: son
+andamiaje generado que nadie compila. Queda anotado para que no se confunda
+con un descuido de la migración.
+
+**Estado de aceptación S09:**
+
+- [x] `grep -rn "com.example.pipefinanzaspersonales" android/ lib/` → vacío
+- [x] `flutter build apk --release` → `app-release.apk` generado (58 MB)
+- [x] `flutter test` sigue en verde — 237 tests
+- [ ] El APK instalado arranca y el flujo completo funciona — **no hay
+      dispositivo Android conectado**; requiere prueba manual
+- [x] Cero permisos de red en el manifest final — verificado con `aapt2` sobre
+      el APK; el único permiso es el de firma de AndroidX
+- [x] El icono y el nombre son los de "Pipe Finanzas" — el nombre verificado
+      con `aapt2`, el icono con fingerprint del asset instalado
+- [x] `versionCode = 1`, `versionName = "1.0.0"` — verificado en el APK
+
 ---
 
 ## 5. Definición de "hecho" (§6)
@@ -5185,30 +5318,30 @@ git commit -m "S09: package ID, release Android y verificación de privacidad"
 El MVP está completo cuando **todo** lo siguiente es cierto:
 
 ### Funcional
-- [ ] Registrar y editar ingresos y gastos con validación completa
-- [ ] Eliminar con confirmación
-- [ ] Dashboard con balance, ingresos, gastos, desglose y 6 meses
-- [ ] Historial agrupado por día con filtro mensual
-- [ ] Estados vacíos en las 3 pantallas
-- [ ] Los datos persisten tras cerrar la app
+- [x] Registrar y editar ingresos y gastos con validación completa
+- [x] Eliminar con confirmación
+- [x] Dashboard con balance, ingresos, gastos, desglose y 6 meses
+- [x] Historial agrupado por día con filtro mensual
+- [ ] Estados vacíos en las 3 pantallas — **dos de tres**: el de "Sin resultados" no es alcanzable, la app no tiene filtros (ver S07)
+- [ ] Los datos persisten tras cerrar la app — **requiere dispositivo**: no hay emulador ni móvil conectado
 
 ### Calidad
-- [ ] `flutter analyze` → `No issues found!`
-- [ ] `flutter test` → todo en verde
-- [ ] Cero hex literales fuera de `AppColors`
-- [ ] `domain/` sin imports de Flutter ni Drift
-- [ ] `presentation/` sin imports de `drift`
-- [ ] Sin TODOs ni `print()` en el código
+- [x] `flutter analyze` → `No issues found!`
+- [x] `flutter test` → todo en verde
+- [x] Cero hex literales fuera de `AppColors`
+- [x] `domain/` sin imports de Flutter ni Drift
+- [x] `presentation/` sin imports de `drift`
+- [x] Sin TODOs ni `print()` en el código
 
 ### Privacidad
-- [ ] Cero permisos de red
-- [ ] Cero dependencias de red
-- [ ] Base de datos solo en almacenamiento local de la app
+- [x] Cero permisos de red — el APK no declara `INTERNET`; el único permiso es el de firma de AndroidX
+- [x] Cero dependencias de red
+- [x] Base de datos solo en almacenamiento local de la app
 
 ### Build
-- [ ] `flutter build apk --release` funciona
-- [ ] Package ID: `com.pipefinanzas.app`
-- [ ] Versión: `1.0.0` (versionCode 1)
+- [x] `flutter build apk --release` funciona — 58 MB (APK gordo, 3 ABIs)
+- [x] Package ID: `com.pipefinanzas.app`
+- [x] Versión: `1.0.0` (versionCode 1)
 
 ---
 
