@@ -44,14 +44,18 @@ class CategoryBreakdownList extends StatelessWidget {
                         Expanded(
                           child: Text(
                             b.categoryName,
-                            style: AppTypography.label,
+                            style: AppTypography.label.copyWith(
+                              color: theme.colorScheme.onSurface,
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         Text(
                           '${CurrencyFormatter.cop.format(b.amount)}  '
                           '${b.percentage.toStringAsFixed(1)}%',
-                          style: AppTypography.label,
+                          style: AppTypography.label.copyWith(
+                            color: theme.colorScheme.onSurface,
+                          ),
                         ),
                       ],
                     ),

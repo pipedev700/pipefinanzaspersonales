@@ -66,7 +66,14 @@ class _TotalCard extends StatelessWidget {
                 // Sin `Expanded`: un `Row` dentro de una `Column` se ajusta al
                 // ancho disponible, pero si la etiqueta se puso aWrapear
                 // borraría el ícono.
-                Flexible(child: Text(label, style: AppTypography.label)),
+                Flexible(
+                  child: Text(
+                    label,
+                    style: AppTypography.label.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: AppSpacing.sm),

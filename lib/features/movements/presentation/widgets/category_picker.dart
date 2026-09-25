@@ -35,10 +35,15 @@ class CategoryPicker extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
+        // 4 columnas, no 3: con 10 categorías de gasto, 3 columnas son 4
+        // filas y el formulario no cabe en la pantalla del móvil. Con 4 son
+        // 3 filas y entra entero.
+        crossAxisCount: 4,
         mainAxisSpacing: AppSpacing.sm,
         crossAxisSpacing: AppSpacing.sm,
-        childAspectRatio: 0.95,
+        // A 360px de ancho la celda sale de 76px: el alto acompaña para
+        // guardar el icono y su etiqueta sin quedarlos pegados al borde.
+        childAspectRatio: 1.05,
       ),
       itemCount: categories.length,
       itemBuilder: (context, index) {
@@ -67,19 +72,26 @@ class CategoryPicker extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CategoryIcon(category: category, size: 36),
-                  const SizedBox(height: AppSpacing.xs),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Text(
-                      category.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        fontWeight: selected
-                            ? FontWeight.w600
-                            : FontWeight.w400,
+                  CategoryIcon(category: category, size: _iconSize),
+                  const SizedBox(height: 2),
+                  Flexible(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: Text(
+                        category.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        // El color va explícito: `labelSmall` no lo
+                        // declara, y sin esto el nombre se quedaba con
+                        // `color: null` y lo resolvía el ambiente.
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurface,
+                          fontSize: _labelSize,
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
                       ),
                     ),
                   ),
@@ -91,4 +103,10 @@ class CategoryPicker extends StatelessWidget {
       },
     );
   }
+
+  /// Icono de 36 a 28 al compactar la rejilla. El objetivo táctil real es la
+  /// celda completa, no el círculo, así que sigue muy por encima del mínimo
+  /// de §35.
+  static const _iconSize = 28.0;
+  static const _labelSize = 10.0;
 }

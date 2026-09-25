@@ -6,6 +6,20 @@ import 'app_typography.dart';
 import 'theme_extensions.dart';
 
 abstract final class AppTheme {
+  /// §19 — Le pone color de texto a un estilo de la escala.
+  ///
+  /// Hace falta porque `AppTypography` son constantes **sin color**, a
+  /// propósito: se reutilizan también sobre fondos de color. Al mapearlas
+  /// tal cual sobre los slots del `textTheme` se perdía el color que
+  /// Material deriva del `ColorScheme`, y el texto se quedaba con
+  /// `color: null`. Un color `null` no es "negra": lo resuelve el ambiente, y
+  /// en la app salía blanco sobre superficies blancas, ilegible.
+  ///
+  /// Los textos que van sobre fondo de color (botones, snackbar, appbar)
+  /// declaran su color aparte y no pasan por aquí.
+  static TextStyle _on(TextStyle style) =>
+      style.copyWith(color: AppColors.textPrimary);
+
   /// Solo se implementa el tema claro (§33). Los tokens quedan
   /// centralizados para poder añadir dark sin reescribir widgets.
   static ThemeData get light {
@@ -29,16 +43,16 @@ abstract final class AppTheme {
     return base.copyWith(
       extensions: const [SemanticColors.light],
       textTheme: base.textTheme.copyWith(
-        headlineLarge: AppTypography.display,
-        headlineMedium: AppTypography.display,
-        titleLarge: AppTypography.title,
-        titleMedium: AppTypography.title,
-        bodyLarge: AppTypography.body,
-        bodyMedium: AppTypography.body,
-        bodySmall: AppTypography.caption,
-        labelLarge: AppTypography.bodyStrong,
-        labelMedium: AppTypography.label,
-        labelSmall: AppTypography.caption,
+        headlineLarge: _on(AppTypography.display),
+        headlineMedium: _on(AppTypography.display),
+        titleLarge: _on(AppTypography.title),
+        titleMedium: _on(AppTypography.title),
+        bodyLarge: _on(AppTypography.body),
+        bodyMedium: _on(AppTypography.body),
+        bodySmall: _on(AppTypography.caption),
+        labelLarge: _on(AppTypography.bodyStrong),
+        labelMedium: _on(AppTypography.label),
+        labelSmall: _on(AppTypography.caption),
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.background,

@@ -33,7 +33,9 @@ class EmptyState extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             Text(
               title,
-              style: AppTypography.title,
+              style: AppTypography.title.copyWith(
+                color: theme.colorScheme.onSurface,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppSpacing.sm),

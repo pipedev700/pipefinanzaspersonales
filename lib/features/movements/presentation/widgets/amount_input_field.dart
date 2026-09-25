@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/currency_formatter.dart';
 
 /// §9 y §15 — Campo numérico con prefijo de moneda.
@@ -34,7 +35,13 @@ class AmountInputField extends StatelessWidget {
         // validadores.
         LengthLimitingTextInputFormatter(12),
       ],
-      style: theme.textTheme.headlineMedium?.copyWith(
+      // Se usa `AppTypography.display` directamente y no el slot
+      // `headlineMedium` del tema, para que el campo no cambie de aspecto si
+      // alguien reasigna ese slot. El color va explícito porque
+      // `AppTypography` son constantes sin color: sin esto el monto quedaba
+      // con `color: null`, lo resolvía el ambiente y salía blanco.
+      style: AppTypography.display.copyWith(
+        color: theme.colorScheme.onSurface,
         fontWeight: FontWeight.w700,
       ),
       decoration: InputDecoration(

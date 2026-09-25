@@ -159,6 +159,10 @@ class _DayHeader extends StatelessWidget {
             child: Text(
               AppDateUtils.formatShort(group.date),
               style: AppTypography.label.copyWith(
+                // Sin este color el encabezado queda con `color: null` y lo
+                // resuelve el ambiente: salía blanco sobre `surface`, igual
+                // que le pasaba al monto y al nombre de las categorías.
+                color: theme.colorScheme.onSurface,
                 fontWeight: FontWeight.w600,
               ),
             ),

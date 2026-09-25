@@ -4,9 +4,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pipefinanzaspersonales/core/providers/repository_providers.dart';
 import 'package:pipefinanzaspersonales/core/theme/app_theme.dart';
+import 'package:pipefinanzaspersonales/features/movements/domain/entities/category.dart';
 import 'package:pipefinanzaspersonales/features/movements/domain/entities/movement.dart';
 import 'package:pipefinanzaspersonales/features/movements/domain/entities/movement_type.dart';
 import 'package:pipefinanzaspersonales/features/movements/presentation/screens/movement_form_screen.dart';
+import 'package:pipefinanzaspersonales/features/movements/presentation/widgets/amount_input_field.dart';
+import 'package:pipefinanzaspersonales/features/movements/presentation/widgets/category_picker.dart';
 import 'package:pipefinanzaspersonales/features/movements/presentation/widgets/date_picker_field.dart';
 
 import '../helpers/fakes.dart';
@@ -85,10 +88,12 @@ void main() {
     await categories.dispose();
   });
 
-  /// Superficie alta: el formulario es un `ListView` largo y en la ventana
-  /// de 800x600 del test los campos inferiores ni siquiera se construyen.
-  void useTallScreen(WidgetTester tester) {
-    tester.view.physicalSize = const Size(1000, 2800);
+  /// Pantalla de móvil real, no una ventana alta: el formulario cabe entero
+  /// en 360x800 con las 10 categorías de gasto, y usar una superficie
+  /// holgada escondería justo lo que se quiere comprobar (que no haya
+  /// scroll). El test de "sin scroll" de abajo ata este tamaño.
+  void usePhoneScreen(WidgetTester tester) {
+    tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
   }
@@ -128,7 +133,7 @@ void main() {
 
   group('campos y validación', () {
     testWidgets('muestra monto, categoría, fecha y descripción', (tester) async {
-      useTallScreen(tester);
+      usePhoneScreen(tester);
       await openNew(tester);
 
       expect(find.text('Nuevo movimiento'), findsOneWidget);
@@ -141,7 +146,7 @@ void main() {
     testWidgets('guardar sin categoría no crea nada y muestra el error', (
       tester,
     ) async {
-      useTallScreen(tester);
+      usePhoneScreen(tester);
       await openNew(tester);
 
       await tester.enterText(find.widgetWithText(TextField, '0'), '25000');
@@ -154,7 +159,7 @@ void main() {
     });
 
     testWidgets('el monto solo admite dígitos', (tester) async {
-      useTallScreen(tester);
+      usePhoneScreen(tester);
       await openNew(tester);
 
       final field = tester.widget<TextField>(
@@ -172,7 +177,7 @@ void main() {
     testWidgets('guarda y vuelve a la pantalla anterior con SnackBar', (
       tester,
     ) async {
-      useTallScreen(tester);
+      usePhoneScreen(tester);
       await openNew(tester);
       await fill(tester);
 
@@ -190,7 +195,7 @@ void main() {
     testWidgets('un movimiento nuevo aparece sin reiniciar la app', (
       tester,
     ) async {
-      useTallScreen(tester);
+      usePhoneScreen(tester);
       await openNew(tester);
       await fill(tester, amount: '999');
 
@@ -205,7 +210,7 @@ void main() {
 
   group('tipo de movimiento', () {
     testWidgets('alterna entre Gasto e Ingreso', (tester) async {
-      useTallScreen(tester);
+      usePhoneScreen(tester);
       await openNew(tester);
 
       await tester.tap(find.text('Ingreso'));
@@ -219,7 +224,7 @@ void main() {
     testWidgets('cambiar de tipo limpia la categoría seleccionada', (
       tester,
     ) async {
-      useTallScreen(tester);
+      usePhoneScreen(tester);
       await openNew(tester);
 
       await tester.enterText(find.widgetWithText(TextField, '0'), '25000');
@@ -246,7 +251,7 @@ void main() {
     testWidgets('precarga monto, tipo, categoría, fecha y descripción', (
       tester,
     ) async {
-      useTallScreen(tester);
+      usePhoneScreen(tester);
       movements.emit([buildExisting()]);
       await openEdit(tester);
 
@@ -259,7 +264,7 @@ void main() {
     });
 
     testWidgets('actualiza en vez de crear', (tester) async {
-      useTallScreen(tester);
+      usePhoneScreen(tester);
       movements.emit([buildExisting()]);
       await openEdit(tester);
 
@@ -277,7 +282,7 @@ void main() {
 
   group('eliminar', () {
     testWidgets('pide confirmación y cancelar no borra', (tester) async {
-      useTallScreen(tester);
+      usePhoneScreen(tester);
       movements.emit([buildExisting()]);
       await openEdit(tester);
 
@@ -293,7 +298,7 @@ void main() {
     });
 
     testWidgets('confirmar borra el movimiento', (tester) async {
-      useTallScreen(tester);
+      usePhoneScreen(tester);
       movements.emit([buildExisting()]);
       await openEdit(tester);
 
@@ -309,7 +314,7 @@ void main() {
 
   group('límites', () {
     testWidgets('la descripción se limita a 100 caracteres', (tester) async {
-      useTallScreen(tester);
+      usePhoneScreen(tester);
       await openNew(tester);
 
       final field = tester.widget<TextField>(find.byType(TextField).last);
@@ -317,7 +322,7 @@ void main() {
     });
 
     testWidgets('el date picker no ofrece fechas futuras', (tester) async {
-      useTallScreen(tester);
+      usePhoneScreen(tester);
       await openNew(tester);
 
       // Se apunta al `InkWell` del campo, no al texto de la etiqueta: la
@@ -339,6 +344,97 @@ void main() {
         dialog.lastDate,
         DateTime(now.year, now.month, now.day),
       );
+    });
+  });
+
+  /// El usuario pidió que el formulario se viera entero en una pantalla, sin
+  /// scroll. Estos tests lo fijan: si alguien vuelve a agrandar los iconos o
+  /// a subir el número de filas, fallan en vez de degradarse en silencio.
+  group('el formulario entra en una pantalla', () {
+    /// Las 10 categorías de gasto reales, que son el peor caso: con 4 de
+    /// ingreso la rejilla es de una sola fila y no llega a apretar.
+    List<Category> diezDeGasto() => List.generate(
+          10,
+          (i) => buildCategory(
+            id: i + 1,
+            name: 'Categoría ${i + 1}',
+            type: MovementType.expense,
+            sortOrder: i,
+          ),
+        );
+
+    testWidgets('no hay scroll con las 10 categorías de gasto', (tester) async {
+      usePhoneScreen(tester);
+      categories = FakeCategoryRepository(diezDeGasto());
+      await openNew(tester);
+
+      final posicion = tester
+          .state<ScrollableState>(
+            find
+                .descendant(
+                  of: find.byType(Scaffold),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          )
+          .position;
+
+      expect(
+        posicion.maxScrollExtent,
+        0,
+        reason: 'el contenido no cabe en 360x800 y hay que hacer scroll',
+      );
+    });
+
+    testWidgets('los campos de entrada quedan arriba y la rejilla debajo',
+        (tester) async {
+      usePhoneScreen(tester);
+      categories = FakeCategoryRepository(diezDeGasto());
+      await openNew(tester);
+
+      double y(Finder f) => tester.getTopLeft(f).dy;
+
+      // Orden pedido: monto, fecha y descripción primero; la rejilla de
+      // iconos al final.
+      expect(
+        y(find.byType(AmountInputField)),
+        lessThan(y(find.byType(DatePickerField))),
+        reason: 'el monto debe ir antes que la fecha',
+      );
+      expect(
+        y(find.byType(DatePickerField)),
+        lessThan(
+          y(find.widgetWithText(TextField, 'Ej: almuerzo en la oficina')),
+        ),
+        reason: 'la fecha debe ir antes que la descripción',
+      );
+      expect(
+        y(find.widgetWithText(TextField, 'Ej: almuerzo en la oficina')),
+        lessThan(y(find.byType(CategoryPicker))),
+        reason: 'la rejilla de iconos va al final',
+      );
+    });
+
+    testWidgets('el nombre de la categoría se pinta en color de texto',
+        (tester) async {
+      usePhoneScreen(tester);
+      await openNew(tester);
+
+      final etiqueta = tester.widget<Text>(
+        find.descendant(
+          of: find.byType(CategoryPicker),
+          matching: find.text('Comida'),
+        ),
+      );
+      final theme = Theme.of(tester.element(find.byType(CategoryPicker)));
+
+      expect(
+        etiqueta.style?.color,
+        isNotNull,
+        reason: 'sin color explícito lo resuelve el ambiente y el nombre '
+            'puede salir blanco sobre surface',
+      );
+      expect(etiqueta.style?.color, theme.colorScheme.onSurface);
     });
   });
 }

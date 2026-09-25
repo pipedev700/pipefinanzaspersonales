@@ -101,12 +101,34 @@ class _MovementFormScreenState extends ConsumerState<MovementFormScreen> {
             value: state.type,
             onChanged: ref.read(movementFormProvider.notifier).setType,
           ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.md),
           AmountInputField(
             controller: _amount,
             onChanged: ref.read(movementFormProvider.notifier).setAmount,
           ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(height: AppSpacing.md),
+          DatePickerField(
+            value: state.date,
+            errorText: state.dateError(),
+            onChanged: ref.read(movementFormProvider.notifier).setDate,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: _description,
+            onChanged: ref.read(movementFormProvider.notifier).setDescription,
+            maxLength: maxDescriptionLength,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              labelText: 'Descripción (opcional)',
+              hintText: 'Ej: almuerzo en la oficina',
+              errorText: state.descriptionError(),
+            ),
+          ),
+          // La rejilla de categorías va al final, no entre los campos: es lo
+          // que el usuario elige último, y así el formulario entero cabe en
+          // una pantalla sin scroll en un móvil de 360x800, con las 10
+          // categorías de gasto.
+          const SizedBox(height: AppSpacing.md),
           Text('Categoría', style: theme.textTheme.titleMedium),
           const SizedBox(height: AppSpacing.sm),
           categories.isEmpty
@@ -131,24 +153,6 @@ class _MovementFormScreenState extends ConsumerState<MovementFormScreen> {
                 ),
               ),
             ),
-          const SizedBox(height: AppSpacing.lg),
-          DatePickerField(
-            value: state.date,
-            errorText: state.dateError(),
-            onChanged: ref.read(movementFormProvider.notifier).setDate,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          TextField(
-            controller: _description,
-            onChanged: ref.read(movementFormProvider.notifier).setDescription,
-            maxLength: maxDescriptionLength,
-            textCapitalization: TextCapitalization.sentences,
-            decoration: InputDecoration(
-              labelText: 'Descripción (opcional)',
-              hintText: 'Ej: almuerzo en la oficina',
-              errorText: state.descriptionError(),
-            ),
-          ),
           if (_showSaveError(state)) ...[
             const SizedBox(height: AppSpacing.sm),
             Text(
@@ -159,7 +163,7 @@ class _MovementFormScreenState extends ConsumerState<MovementFormScreen> {
             ),
           ],
           // Empuja el contenido para que el teclado no tape el botón.
-          SizedBox(height: bottomInset > 0 ? bottomInset : AppSpacing.lg),
+          SizedBox(height: bottomInset > 0 ? bottomInset : AppSpacing.sm),
         ],
       ),
       bottomNavigationBar: SafeArea(
