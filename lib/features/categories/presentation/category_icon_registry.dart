@@ -18,6 +18,9 @@ abstract final class CategoryIconRegistry {
     'school': Icons.school,
     'shopping_bag': Icons.shopping_bag,
     'devices': Icons.devices,
+    'pets': Icons.pets,
+    'savings_outlined': Icons.savings_outlined,
+    'credit_card': Icons.credit_card,
     // Ingresos
     'work': Icons.work,
     'laptop_mac': Icons.laptop_mac,
@@ -32,7 +35,7 @@ abstract final class CategoryIconRegistry {
   static IconData resolve(String key) => _icons[key] ?? Icons.category;
 
   /// `true` si la clave tiene icono propio. Lo usan los tests para detectar
-  /// typos en la semilla: sin esto, un `iconKey` mal escrito degrada los 14
+  /// typos en la semilla: sin esto, un `iconKey` mal escrito degrada los 16
   /// iconos a `Icons.category` sin que nada falle.
   static bool has(String key) => _icons.containsKey(key);
 

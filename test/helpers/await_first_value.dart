@@ -40,5 +40,7 @@ Future<T> awaitValueWhere<T>(
     }
     await Future<void>.delayed(Duration.zero);
   }
-  fail('Timeout esperando: ${description ?? 'un valor que cumpla la condición'}');
+  fail(
+    'Timeout esperando: ${description ?? 'un valor que cumpla la condición'}',
+  );
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
+import '../../features/historical/presentation/screens/historical_screen.dart';
 import '../../features/movements/presentation/screens/history_screen.dart';
 import '../../features/movements/presentation/screens/movement_form_screen.dart';
 import '../../shared/widgets/app_scaffold.dart';
@@ -42,6 +43,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: AppRoutes.history,
                 builder: (context, state) => const HistoryScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: AppRoutes.historical,
+                builder: (context, state) => const HistoricalScreen(),
               ),
             ],
           ),

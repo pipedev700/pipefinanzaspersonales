@@ -68,7 +68,7 @@ void main() {
   group('DriftCategoryRepository', () {
     test('getAll devuelve el catálogo completo y ordenado', () async {
       final all = await categories.getAll();
-      expect(all, hasLength(14));
+      expect(all, hasLength(17));
       expect(
         all.map((c) => c.sortOrder),
         orderedEquals(all.map((c) => c.sortOrder).toList()..sort()),
@@ -95,7 +95,7 @@ void main() {
 
     test('watchAll emite el catálogo y sobrevive al flujo', () async {
       final emitted = await collect(categories.watchAll(), 1);
-      expect(emitted.single, hasLength(14));
+      expect(emitted.single, hasLength(17));
     });
   });
 
@@ -130,7 +130,11 @@ void main() {
     });
 
     test('getById resuelve la categoría por JOIN', () async {
-      final id = await movements.create(_draft(45000, 11, DateTime(2026, 1, 10)));
+      // 14 = "Salario" con el catálogo de 17 filas. Se busca por id porque el
+      // DAO recibe el id, no el nombre.
+      final id = await movements.create(
+        _draft(45000, 14, DateTime(2026, 1, 10)),
+      );
       final found = await movements.getById(id);
 
       expect(found, isNotNull);
@@ -184,16 +188,57 @@ void main() {
       expect(updated.description, 'bus');
       expect(updated.date, DateTime(2026, 1, 12));
       expect(updated.category.name, 'Transporte');
-      expect(updated.createdAt, created.createdAt, reason: 'createdAt es inmutable');
+      expect(
+        updated.createdAt,
+        created.createdAt,
+        reason: 'createdAt es inmutable',
+      );
       expect(updated.id, created.id);
 
       await movements.delete(id);
       expect(await movements.getById(id), isNull);
     });
 
+    test('editar uno no toca los demás movimientos de la tabla', () async {
+      // Este es el caso que faltaba y el que rompía la app: el `UPDATE` se
+      // generaba sin `WHERE`, así que con dos o más filas en la tabla SQLite
+      // fallaba con "UNIQUE constraint failed: movements.id" y el formulario
+      // respondía "No se pudo guardar". Con una sola fila el `UPDATE` sin
+      // `WHERE` es indistinguible del correcto, por eso hace falta más de un
+      // registro en la tabla.
+      final primero = await movements.create(
+        _draft(11111, 1, DateTime(2026, 1, 5), description: 'a'),
+      );
+      final segundo = await movements.create(
+        _draft(22222, 2, DateTime(2026, 1, 6), description: 'b'),
+      );
+
+      final ok = await movements.update(
+        segundo,
+        _draft(33333, 3, DateTime(2026, 1, 7), description: 'editado'),
+      );
+      expect(ok, isTrue, reason: 'no debe lanzar por colisión de id');
+
+      final tras = await movements.getAll();
+      expect(tras.map((m) => m.amount).toList()..sort(), [11111, 33333]);
+      expect(
+        (await movements.getById(primero))!.description,
+        'a',
+        reason: 'el otro movimiento no se puede mover de sitio ni de amount',
+      );
+    });
+
+    test('editar un id inexistente devuelve false y no lanza', () async {
+      await movements.create(_draft(1000, 1, DateTime(2026, 1, 5)));
+      expect(
+        await movements.update(9999, _draft(2000, 1, DateTime(2026, 1, 6))),
+        isFalse,
+      );
+    });
+
     test('el tipo de ingreso sobrevive al round-trip', () async {
       final id = await movements.create(
-        _draft(900000, 11, DateTime(2026, 1, 31), type: MovementType.income),
+        _draft(900000, 13, DateTime(2026, 1, 31), type: MovementType.income),
       );
       final found = await movements.getById(id);
 
@@ -204,7 +249,7 @@ void main() {
 
     test('editar a gasto invierte el signo sin tocar el monto', () async {
       final id = await movements.create(
-        _draft(900000, 11, DateTime(2026, 1, 31), type: MovementType.income),
+        _draft(900000, 13, DateTime(2026, 1, 31), type: MovementType.income),
       );
       await movements.update(
         id,

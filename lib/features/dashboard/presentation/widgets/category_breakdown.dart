@@ -23,10 +23,7 @@ class CategoryBreakdownList extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Gastos por categoría',
-              style: theme.textTheme.titleMedium,
-            ),
+            Text('Gastos por categoría', style: theme.textTheme.titleMedium),
             const SizedBox(height: AppSpacing.md),
             for (final b in items)
               Padding(
@@ -69,7 +66,8 @@ class CategoryBreakdownList extends StatelessWidget {
                         // dan exactamente 100.
                         value: (b.percentage / 100).clamp(0.0, 1.0),
                         minHeight: 6,
-                        backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                        backgroundColor:
+                            theme.colorScheme.surfaceContainerHighest,
                         valueColor: AlwaysStoppedAnimation(Color(b.colorValue)),
                       ),
                     ),

@@ -14,15 +14,10 @@ final categoriesProvider = StreamProvider<List<Category>>(
 
 /// Helper único para no repetir el filtrado en los dos providers.
 /// Preserva el orden que entrega el DAO (`ORDER BY sortOrder`).
-List<Category> _filterByType(
-  AsyncValue<List<Category>> source,
-  bool isIncome,
-) {
+List<Category> _filterByType(AsyncValue<List<Category>> source, bool isIncome) {
   final list = source.value;
   if (list == null) return const [];
-  return list
-      .where((c) => c.type.isIncome == isIncome)
-      .toList(growable: false);
+  return list.where((c) => c.type.isIncome == isIncome).toList(growable: false);
 }
 
 /// Categorías de gasto para el selector (§12).

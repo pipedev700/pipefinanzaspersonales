@@ -40,10 +40,8 @@ Finder inBreakdown(String text) => find.descendant(
   matching: find.text(text),
 );
 
-Finder inLastMonth(String text) => find.descendant(
-  of: find.byType(LastMonthCard),
-  matching: find.text(text),
-);
+Finder inLastMonth(String text) =>
+    find.descendant(of: find.byType(LastMonthCard), matching: find.text(text));
 
 DateTime thisMonth() {
   final now = DateTime.now();
@@ -92,8 +90,16 @@ void main() {
     testWidgets('muestra balance, ingresos y gastos', (tester) async {
       useTallScreen(tester);
       movements.emit([
-        buildMovement(id: 1, amount: 250000, date: DateTime(month.year, month.month, 3)),
-        buildMovement(id: 2, amount: 60000, date: DateTime(month.year, month.month, 4)),
+        buildMovement(
+          id: 1,
+          amount: 250000,
+          date: DateTime(month.year, month.month, 3),
+        ),
+        buildMovement(
+          id: 2,
+          amount: 60000,
+          date: DateTime(month.year, month.month, 4),
+        ),
         buildMovement(
           id: 3,
           amount: 2000000,
@@ -103,7 +109,10 @@ void main() {
       ]);
       await openDashboard(tester);
 
-      expect(find.text('Balance · ${_monthName(month.month)} ${month.year}'), findsOneWidget);
+      expect(
+        find.text('Balance · ${_monthName(month.month)} ${month.year}'),
+        findsOneWidget,
+      );
       // Delimitado a las tarjetas: la leyenda del gráfico de 6 meses también
       // dice "Ingresos" y "Gastos".
       expect(inTotals('Ingresos'), findsOneWidget);
@@ -126,28 +135,40 @@ void main() {
       await openDashboard(tester);
 
       final balance = tester.widget<Text>(inBalance('+\$900.000'));
-      final semantic = Theme.of(tester.element(find.byType(Text).first))
-          .extension<SemanticColors>()!;
+      final semantic = Theme.of(
+        tester.element(find.byType(Text).first),
+      ).extension<SemanticColors>()!;
       expect(balance.style?.color, semantic.income);
     });
 
     testWidgets('el balance es rojo cuando es negativo', (tester) async {
       useTallScreen(tester);
       movements.emit([
-        buildMovement(id: 1, amount: 450000, date: DateTime(month.year, month.month, 2)),
+        buildMovement(
+          id: 1,
+          amount: 450000,
+          date: DateTime(month.year, month.month, 2),
+        ),
       ]);
       await openDashboard(tester);
 
       final balance = tester.widget<Text>(inBalance('-\$450.000'));
-      final semantic = Theme.of(tester.element(find.byType(Text).first))
-          .extension<SemanticColors>()!;
+      final semantic = Theme.of(
+        tester.element(find.byType(Text).first),
+      ).extension<SemanticColors>()!;
       expect(balance.style?.color, semantic.expense);
     });
 
-    testWidgets('con un solo movimiento el balance es ese monto', (tester) async {
+    testWidgets('con un solo movimiento el balance es ese monto', (
+      tester,
+    ) async {
       useTallScreen(tester);
       movements.emit([
-        buildMovement(id: 1, amount: 73500, date: DateTime(month.year, month.month, 9)),
+        buildMovement(
+          id: 1,
+          amount: 73500,
+          date: DateTime(month.year, month.month, 9),
+        ),
       ]);
       await openDashboard(tester);
 
@@ -155,7 +176,9 @@ void main() {
       expect(inTotals('\$73.500'), findsOneWidget);
     });
 
-    testWidgets('muestra la tasa de ahorro cuando es calculable', (tester) async {
+    testWidgets('muestra la tasa de ahorro cuando es calculable', (
+      tester,
+    ) async {
       useTallScreen(tester);
       movements.emit([
         buildMovement(
@@ -164,7 +187,11 @@ void main() {
           date: DateTime(month.year, month.month, 1),
           type: MovementType.income,
         ),
-        buildMovement(id: 2, amount: 250000, date: DateTime(month.year, month.month, 2)),
+        buildMovement(
+          id: 2,
+          amount: 250000,
+          date: DateTime(month.year, month.month, 2),
+        ),
       ]);
       await openDashboard(tester);
 
@@ -174,11 +201,21 @@ void main() {
     testWidgets('sin ingresos no inventa una tasa de ahorro', (tester) async {
       useTallScreen(tester);
       movements.emit([
-        buildMovement(id: 1, amount: 40000, date: DateTime(month.year, month.month, 2)),
+        buildMovement(
+          id: 1,
+          amount: 40000,
+          date: DateTime(month.year, month.month, 2),
+        ),
       ]);
       await openDashboard(tester);
 
-      expect(find.descendant(of: find.byType(BalanceCard), matching: find.textContaining('Ahorro:')), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(BalanceCard),
+          matching: find.textContaining('Ahorro:'),
+        ),
+        findsNothing,
+      );
     });
   });
 
@@ -190,11 +227,26 @@ void main() {
       categories = FakeCategoryRepository([
         buildCategory(id: 1, name: 'Comida', iconKey: 'restaurant'),
         buildCategory(id: 2, name: 'Transporte', iconKey: 'directions_bus'),
-        buildCategory(id: 3, name: 'Salario', type: MovementType.income, iconKey: 'work'),
+        buildCategory(
+          id: 3,
+          name: 'Salario',
+          type: MovementType.income,
+          iconKey: 'work',
+        ),
       ]);
       movements.emit([
-        buildMovement(id: 1, amount: 25000, date: DateTime(month.year, month.month, 1), categoryId: 1),
-        buildMovement(id: 2, amount: 75000, date: DateTime(month.year, month.month, 1), categoryId: 2),
+        buildMovement(
+          id: 1,
+          amount: 25000,
+          date: DateTime(month.year, month.month, 1),
+          categoryId: 1,
+        ),
+        buildMovement(
+          id: 2,
+          amount: 75000,
+          date: DateTime(month.year, month.month, 1),
+          categoryId: 2,
+        ),
       ]);
       await openDashboard(tester);
 
@@ -254,8 +306,16 @@ void main() {
       useTallScreen(tester);
       final previous = DateTime(month.year, month.month - 1);
       movements.emit([
-        buildMovement(id: 1, amount: 100000, date: DateTime(month.year, month.month, 3)),
-        buildMovement(id: 2, amount: 7000, date: DateTime(previous.year, previous.month, 3)),
+        buildMovement(
+          id: 1,
+          amount: 100000,
+          date: DateTime(month.year, month.month, 3),
+        ),
+        buildMovement(
+          id: 2,
+          amount: 7000,
+          date: DateTime(previous.year, previous.month, 3),
+        ),
       ]);
       await openDashboard(tester);
       expect(inBalance('-\$100.000'), findsOneWidget);
@@ -276,7 +336,11 @@ void main() {
     testWidgets('› está deshabilitado en el mes actual', (tester) async {
       useTallScreen(tester);
       movements.emit([
-        buildMovement(id: 1, amount: 1000, date: DateTime(month.year, month.month, 3)),
+        buildMovement(
+          id: 1,
+          amount: 1000,
+          date: DateTime(month.year, month.month, 3),
+        ),
       ]);
       await openDashboard(tester);
 
@@ -293,7 +357,11 @@ void main() {
       useTallScreen(tester);
       final previous = DateTime(month.year, month.month - 1);
       movements.emit([
-        buildMovement(id: 1, amount: 7000, date: DateTime(previous.year, previous.month, 3)),
+        buildMovement(
+          id: 1,
+          amount: 7000,
+          date: DateTime(previous.year, previous.month, 3),
+        ),
       ]);
       await openDashboard(tester);
 
@@ -305,7 +373,11 @@ void main() {
       // árbol y `.first` sería el offstage.
       await tester.tap(find.byTooltip('Mes anterior').hitTestable());
       await tester.pumpAndSettle();
-      expect(find.byType(MovementTile), findsOneWidget, reason: 'el mes anterior sí tiene un gasto');
+      expect(
+        find.byType(MovementTile),
+        findsOneWidget,
+        reason: 'el mes anterior sí tiene un gasto',
+      );
 
       await tester.tap(find.text('Inicio').last);
       await tester.pumpAndSettle();
@@ -351,8 +423,16 @@ void main() {
     testWidgets('todas las barras comparten una escala', (tester) async {
       useTallScreen(tester);
       movements.emit([
-        buildMovement(id: 1, amount: 1000000, date: DateTime(month.year, month.month, 2)),
-        buildMovement(id: 2, amount: 100000, date: DateTime(month.year, month.month - 1, 2)),
+        buildMovement(
+          id: 1,
+          amount: 1000000,
+          date: DateTime(month.year, month.month, 2),
+        ),
+        buildMovement(
+          id: 2,
+          amount: 100000,
+          date: DateTime(month.year, month.month - 1, 2),
+        ),
       ]);
       await openDashboard(tester);
 
@@ -383,7 +463,11 @@ void main() {
           date: DateTime(month.year, month.month, 2),
           type: MovementType.income,
         ),
-        buildMovement(id: 2, amount: 1000, date: DateTime(month.year, month.month, 2)),
+        buildMovement(
+          id: 2,
+          amount: 1000,
+          date: DateTime(month.year, month.month, 2),
+        ),
       ]);
       await openDashboard(tester);
 
@@ -400,7 +484,11 @@ void main() {
     testWidgets('las barras llevan el importe en el tooltip', (tester) async {
       useTallScreen(tester);
       movements.emit([
-        buildMovement(id: 1, amount: 250000, date: DateTime(month.year, month.month, 2)),
+        buildMovement(
+          id: 1,
+          amount: 250000,
+          date: DateTime(month.year, month.month, 2),
+        ),
       ]);
       await openDashboard(tester);
 
@@ -426,7 +514,11 @@ void main() {
             body: MonthlyBars(
               bars: List.generate(
                 6,
-                (i) => MonthlyBar(month: DateTime(2026, i + 1), income: 0, expense: 0),
+                (i) => MonthlyBar(
+                  month: DateTime(2026, i + 1),
+                  income: 0,
+                  expense: 0,
+                ),
               ),
             ),
           ),
@@ -444,7 +536,11 @@ void main() {
     ) async {
       useTallScreen(tester);
       movements.emit([
-        buildMovement(id: 1, amount: 450000, date: DateTime(month.year, month.month, 2)),
+        buildMovement(
+          id: 1,
+          amount: 450000,
+          date: DateTime(month.year, month.month, 2),
+        ),
       ]);
       await openDashboard(tester);
 
@@ -512,10 +608,32 @@ void main() {
       await openDashboard(tester);
 
       expect(find.text('Este mes'), findsOneWidget);
-      expect(
-        find.textContaining('Aún no tienes movimientos'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('Aún no tienes movimientos'), findsOneWidget);
+    });
+
+    testWidgets('el estado vacío no desborda en un móvil de 360x800', (
+      tester,
+    ) async {
+      // El aviso que veía el usuario: con la caja de 240 fijos, el texto se
+      // salía y Flutter pintaba "BOTTOM OVERFLOWED BY 74 PIXELS".
+      for (final scale in const [1.0, 1.3, 1.5]) {
+        tester.view.physicalSize = const Size(360, 800);
+        tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        await openDashboard(tester);
+
+        expect(
+          tester.takeException(),
+          isNull,
+          reason: 'el estado vacío desbordó con la fuente al $scale',
+        );
+        expect(
+          find.textContaining('Aún no tienes movimientos'),
+          findsOneWidget,
+        );
+      }
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     });
 
     testWidgets('un mes con gasto e ingreso del mismo valor no parece vacío', (
@@ -525,7 +643,11 @@ void main() {
       // Balance 0 pero con datos: si el estado vacío se decidiera por el
       // balance, esta pantalla mostraría "Aún no tienes movimientos".
       movements.emit([
-        buildMovement(id: 1, amount: 50000, date: DateTime(month.year, month.month, 1)),
+        buildMovement(
+          id: 1,
+          amount: 50000,
+          date: DateTime(month.year, month.month, 1),
+        ),
         buildMovement(
           id: 2,
           amount: 50000,
@@ -538,7 +660,11 @@ void main() {
       expect(find.textContaining('Aún no tienes movimientos'), findsNothing);
       // `formatSigned(0)` da `+$0`: el cero es un balance, no un hueco.
       expect(inBalance('+\$0'), findsOneWidget);
-      expect(inTotals('\$50.000'), findsNWidgets(2), reason: 'ingresos y gastos');
+      expect(
+        inTotals('\$50.000'),
+        findsNWidgets(2),
+        reason: 'ingresos y gastos',
+      );
     });
 
     testWidgets('un fallo del repositorio muestra un mensaje de error', (
@@ -546,7 +672,11 @@ void main() {
     ) async {
       useTallScreen(tester);
       movements.emit([
-        buildMovement(id: 1, amount: 1000, date: DateTime(month.year, month.month, 3)),
+        buildMovement(
+          id: 1,
+          amount: 1000,
+          date: DateTime(month.year, month.month, 3),
+        ),
       ]);
       await openDashboard(tester);
       expect(inBalance('-\$1.000'), findsOneWidget);
@@ -659,32 +789,40 @@ void main() {
       expect(find.text('Últimos 6 meses'), findsOneWidget);
     });
 
-    testWidgets('"ver el mes actual" solo aparece fuera del mes en curso y vuelve', (
-      tester,
-    ) async {
-      useTallScreen(tester);
-      movements.emit([
-        buildMovement(id: 1, amount: 80000, date: DateTime(month.year, month.month, 3)),
-      ]);
-      await openDashboard(tester);
-      // El mes en curso tiene datos, así que no hay a dónde "volver".
-      expect(find.text('Ver el mes actual'), findsNothing);
+    testWidgets(
+      '"ver el mes actual" solo aparece fuera del mes en curso y vuelve',
+      (tester) async {
+        useTallScreen(tester);
+        movements.emit([
+          buildMovement(
+            id: 1,
+            amount: 80000,
+            date: DateTime(month.year, month.month, 3),
+          ),
+        ]);
+        await openDashboard(tester);
+        // El mes en curso tiene datos, así que no hay a dónde "volver".
+        expect(find.text('Ver el mes actual'), findsNothing);
 
-      await tester.tap(find.byTooltip('Mes anterior').hitTestable());
-      await tester.pumpAndSettle();
-      // Mes pasado vacío con el mes en curso lleno: el caso del usuario.
-      expect(find.textContaining('Aún no tienes movimientos'), findsOneWidget);
-      expect(find.text('Ver el mes actual'), findsOneWidget);
-      // Y el mes anterior tampoco tiene datos de nada, así que no hay resumen
-      // que ofrecer: la ventana de seis meses está vacía.
-      expect(find.byType(LastMonthCard), findsNothing);
+        await tester.tap(find.byTooltip('Mes anterior').hitTestable());
+        await tester.pumpAndSettle();
+        // Mes pasado vacío con el mes en curso lleno: el caso del usuario.
+        expect(
+          find.textContaining('Aún no tienes movimientos'),
+          findsOneWidget,
+        );
+        expect(find.text('Ver el mes actual'), findsOneWidget);
+        // Y el mes anterior tampoco tiene datos de nada, así que no hay resumen
+        // que ofrecer: la ventana de seis meses está vacía.
+        expect(find.byType(LastMonthCard), findsNothing);
 
-      await tester.tap(find.text('Ver el mes actual'));
-      await tester.pumpAndSettle();
+        await tester.tap(find.text('Ver el mes actual'));
+        await tester.pumpAndSettle();
 
-      expect(inBalance('-\$80.000'), findsOneWidget);
-      expect(find.text('Ver el mes actual'), findsNothing);
-    });
+        expect(inBalance('-\$80.000'), findsOneWidget);
+        expect(find.text('Ver el mes actual'), findsNothing);
+      },
+    );
 
     testWidgets('sin datos en la ventana no hay resumen ni gráfico', (
       tester,
@@ -727,6 +865,16 @@ void main() {
 }
 
 String _monthName(int m) => const [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
 ][m - 1];

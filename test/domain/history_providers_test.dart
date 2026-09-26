@@ -15,7 +15,7 @@ ProviderContainer makeContainer(FakeMovementRepository repo) {
     overrides: [movementRepositoryProvider.overrideWithValue(repo)],
   );
   addTearDown(container.dispose);
-  container.listen(movementsForSelectedMonthProvider, (_, _) {});
+  container.listen(monthMovementsProvider, (_, _) {});
   return container;
 }
 
@@ -30,9 +30,21 @@ void main() {
   group('agrupado por día', () {
     test('los días salen del más reciente al más antiguo', () async {
       final repo = FakeMovementRepository([
-        buildMovement(id: 1, amount: 1000, date: DateTime(month.year, month.month, 3)),
-        buildMovement(id: 2, amount: 2000, date: DateTime(month.year, month.month, 20)),
-        buildMovement(id: 3, amount: 3000, date: DateTime(month.year, month.month, 11)),
+        buildMovement(
+          id: 1,
+          amount: 1000,
+          date: DateTime(month.year, month.month, 3),
+        ),
+        buildMovement(
+          id: 2,
+          amount: 2000,
+          date: DateTime(month.year, month.month, 20),
+        ),
+        buildMovement(
+          id: 3,
+          amount: 3000,
+          date: DateTime(month.year, month.month, 11),
+        ),
       ]);
       final container = makeContainer(repo);
 
@@ -50,8 +62,16 @@ void main() {
 
     test('cada día lleva sus subtotales de ingreso y gasto', () async {
       final repo = FakeMovementRepository([
-        buildMovement(id: 1, amount: 5000, date: DateTime(month.year, month.month, 7)),
-        buildMovement(id: 2, amount: 1200, date: DateTime(month.year, month.month, 7)),
+        buildMovement(
+          id: 1,
+          amount: 5000,
+          date: DateTime(month.year, month.month, 7),
+        ),
+        buildMovement(
+          id: 2,
+          amount: 1200,
+          date: DateTime(month.year, month.month, 7),
+        ),
         buildMovement(
           id: 3,
           amount: 900000,
@@ -71,25 +91,44 @@ void main() {
       expect(groups.single.movements, hasLength(3));
     });
 
-    test('dentro de un día el orden también es el más reciente primero', () async {
-      final repo = FakeMovementRepository([
-        buildMovement(id: 1, amount: 100, date: DateTime(month.year, month.month, 7, 9)),
-        buildMovement(id: 2, amount: 200, date: DateTime(month.year, month.month, 7, 18)),
-      ]);
-      final container = makeContainer(repo);
+    test(
+      'dentro de un día el orden también es el más reciente primero',
+      () async {
+        final repo = FakeMovementRepository([
+          buildMovement(
+            id: 1,
+            amount: 100,
+            date: DateTime(month.year, month.month, 7, 9),
+          ),
+          buildMovement(
+            id: 2,
+            amount: 200,
+            date: DateTime(month.year, month.month, 7, 18),
+          ),
+        ]);
+        final container = makeContainer(repo);
 
-      final groups = await awaitFirstValue(
-        () => container.read(historyGroupsProvider),
-      );
+        final groups = await awaitFirstValue(
+          () => container.read(historyGroupsProvider),
+        );
 
-      expect(groups.single.movements.map((m) => m.id), [2, 1]);
-    });
+        expect(groups.single.movements.map((m) => m.id), [2, 1]);
+      },
+    );
 
     test('el filtro descarta los movimientos de otros meses', () async {
       final previous = DateTime(month.year, month.month - 1);
       final repo = FakeMovementRepository([
-        buildMovement(id: 1, amount: 1000, date: DateTime(month.year, month.month, 5)),
-        buildMovement(id: 2, amount: 9999, date: DateTime(previous.year, previous.month, 5)),
+        buildMovement(
+          id: 1,
+          amount: 1000,
+          date: DateTime(month.year, month.month, 5),
+        ),
+        buildMovement(
+          id: 2,
+          amount: 9999,
+          date: DateTime(previous.year, previous.month, 5),
+        ),
       ]);
       final container = makeContainer(repo);
 
@@ -98,28 +137,47 @@ void main() {
       );
 
       expect(groups, hasLength(1));
-      expect(groups.single.totalExpense, 1000, reason: 'no debe filtrar el mes anterior');
-    });
-
-    test('una nueva emisión del repositorio reagrupa sin recrear el provider', () async {
-      final repo = FakeMovementRepository([
-        buildMovement(id: 1, amount: 1000, date: DateTime(month.year, month.month, 5)),
-      ]);
-      final container = makeContainer(repo);
-      await awaitFirstValue(() => container.read(historyGroupsProvider));
-
-      repo.emit([
-        buildMovement(id: 1, amount: 1000, date: DateTime(month.year, month.month, 5)),
-        buildMovement(id: 2, amount: 2000, date: DateTime(month.year, month.month, 8)),
-      ]);
-
-      final groups = await awaitValueWhere<List<DailyGroup>>(
-        () => container.read(historyGroupsProvider),
-        (g) => g.length == 2,
-        description: 'la actualización tras emitir',
+      expect(
+        groups.single.totalExpense,
+        1000,
+        reason: 'no debe filtrar el mes anterior',
       );
-      expect(groups.map((g) => g.date.day), [8, 5]);
     });
+
+    test(
+      'una nueva emisión del repositorio reagrupa sin recrear el provider',
+      () async {
+        final repo = FakeMovementRepository([
+          buildMovement(
+            id: 1,
+            amount: 1000,
+            date: DateTime(month.year, month.month, 5),
+          ),
+        ]);
+        final container = makeContainer(repo);
+        await awaitFirstValue(() => container.read(historyGroupsProvider));
+
+        repo.emit([
+          buildMovement(
+            id: 1,
+            amount: 1000,
+            date: DateTime(month.year, month.month, 5),
+          ),
+          buildMovement(
+            id: 2,
+            amount: 2000,
+            date: DateTime(month.year, month.month, 8),
+          ),
+        ]);
+
+        final groups = await awaitValueWhere<List<DailyGroup>>(
+          () => container.read(historyGroupsProvider),
+          (g) => g.length == 2,
+          description: 'la actualización tras emitir',
+        );
+        expect(groups.map((g) => g.date.day), [8, 5]);
+      },
+    );
   });
 
   group('selectedMonthProvider', () {
@@ -149,9 +207,133 @@ void main() {
     test('goTo() descarta el día: el filtro es por mes', () {
       final container = makeContainer(FakeMovementRepository());
 
-      container.read(selectedMonthProvider.notifier).goTo(DateTime(2026, 5, 17));
+      container
+          .read(selectedMonthProvider.notifier)
+          .goTo(DateTime(2026, 5, 17));
 
       expect(container.read(selectedMonthProvider), DateTime(2026, 5));
+    });
+  });
+
+  group('filtro por categoría', () {
+    test('empieza vacío, que significa "todas"', () {
+      final container = makeContainer(FakeMovementRepository());
+
+      expect(container.read(historyCategoryFilterProvider), isEmpty);
+    });
+
+    test('toggle() añade y quita, y nunca duplica', () {
+      final container = makeContainer(FakeMovementRepository());
+      final notifier = container.read(historyCategoryFilterProvider.notifier);
+
+      notifier
+        ..toggle(1)
+        ..toggle(2)
+        ..toggle(1);
+      expect(container.read(historyCategoryFilterProvider), {2});
+
+      notifier.toggle(2);
+      expect(container.read(historyCategoryFilterProvider), isEmpty);
+    });
+
+    test('clear() vuelve a todas', () {
+      final container = makeContainer(FakeMovementRepository());
+      final notifier = container.read(historyCategoryFilterProvider.notifier);
+      notifier.toggle(1);
+
+      notifier.clear();
+
+      expect(container.read(historyCategoryFilterProvider), isEmpty);
+    });
+
+    test('un filtro nuevo invalida la lista del mes', () async {
+      final repo = FakeMovementRepository([
+        buildMovement(
+          id: 1,
+          amount: 1000,
+          date: DateTime(month.year, month.month, 5),
+        ),
+        buildMovement(
+          id: 2,
+          amount: 2000,
+          date: DateTime(month.year, month.month, 6),
+          categoryId: 2,
+          categoryName: 'Transporte',
+        ),
+      ]);
+      final container = makeContainer(repo);
+      await awaitFirstValue(() => container.read(historyGroupsProvider));
+
+      container.read(historyCategoryFilterProvider.notifier).toggle(2);
+
+      final groups = await awaitValueWhere(
+        () => container.read(historyGroupsProvider),
+        (g) => g.length == 1,
+        description: 'la lista filtrada',
+      );
+      expect(groups.single.movements.single.id, 2);
+    });
+
+    test(
+      'el filtro y el mes se combinan: primero mes, luego categoría',
+      () async {
+        final previous = DateTime(month.year, month.month - 1);
+        final repo = FakeMovementRepository([
+          buildMovement(
+            id: 1,
+            amount: 1000,
+            date: DateTime(month.year, month.month, 5),
+          ),
+          buildMovement(
+            id: 2,
+            amount: 2000,
+            date: DateTime(previous.year, previous.month, 5),
+          ),
+          buildMovement(
+            id: 3,
+            amount: 3000,
+            date: DateTime(month.year, month.month, 7),
+            categoryId: 2,
+            categoryName: 'Transporte',
+          ),
+        ]);
+        final container = makeContainer(repo);
+        container.read(historyCategoryFilterProvider.notifier).toggle(2);
+
+        final groups = await awaitFirstValue(
+          () => container.read(historyGroupsProvider),
+          description: 'historyGroupsProvider filtrado',
+        );
+
+        // "Transporte" del mes actual: el movimiento de Comida y el del mes
+        // anterior quedan fuera, por dos razones distintas.
+        expect(groups.single.totalExpense, 3000);
+      },
+    );
+  });
+
+  group('applyCategoryFilter', () {
+    final list = [
+      buildMovement(id: 1, amount: 1000, date: DateTime(2026, 2, 1)),
+      buildMovement(
+        id: 2,
+        amount: 2000,
+        date: DateTime(2026, 2, 2),
+        categoryId: 2,
+        categoryName: 'Transporte',
+      ),
+    ];
+
+    test('con el conjunto vacío devuelve la lista tal cual', () {
+      expect(applyCategoryFilter(list, const {}), same(list));
+    });
+
+    test('deja solo las categorías elegidas y conserva el orden', () {
+      expect(applyCategoryFilter(list, const {2}).map((m) => m.id), [2]);
+    });
+
+    test('un conjunto con ids inexistentes deja la lista vacía', () {
+      expect(applyCategoryFilter(list, const {99}), isEmpty);
     });
   });
 

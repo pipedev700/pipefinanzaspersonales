@@ -62,6 +62,5 @@ class SemanticColors extends ThemeExtension<SemanticColors> {
 }
 
 extension SemanticColorsX on BuildContext {
-  SemanticColors get semantic =>
-      Theme.of(this).extension<SemanticColors>()!;
+  SemanticColors get semantic => Theme.of(this).extension<SemanticColors>()!;
 }

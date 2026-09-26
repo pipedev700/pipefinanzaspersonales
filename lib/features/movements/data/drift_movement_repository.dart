@@ -14,7 +14,12 @@ class DriftMovementRepository implements MovementRepository {
   Stream<List<Movement>> watchAll() => _dao.watchAll();
 
   @override
-  Stream<List<Movement>> watchByMonth(DateTime month) => _dao.watchByMonth(month);
+  Stream<List<Movement>> watchByMonth(DateTime month) =>
+      _dao.watchByMonth(month);
+
+  @override
+  Stream<List<Movement>> watchByRange(DateTime start, DateTime end) =>
+      _dao.watchByRange(start, end);
 
   @override
   Future<List<Movement>> getByMonth(DateTime month) => _dao.getByMonth(month);

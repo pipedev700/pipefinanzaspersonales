@@ -14,6 +14,14 @@ void main() {
       expect(CategoryIconRegistry.resolve('more_horiz'), Icons.more_horiz);
     });
 
+    test('la huella de mascotas y la inversión tienen glifo propio', () {
+      expect(CategoryIconRegistry.resolve('pets'), Icons.pets);
+      expect(
+        CategoryIconRegistry.resolve('savings_outlined'),
+        Icons.savings_outlined,
+      );
+    });
+
     test('una clave desconocida cae al icono genérico, no lanza', () {
       expect(CategoryIconRegistry.resolve('no_existe'), Icons.category);
       expect(CategoryIconRegistry.resolve(''), Icons.category);
@@ -25,9 +33,9 @@ void main() {
     });
 
     // Este es el test que importa: si una `iconKey` de la semilla tiene un
-    // typo, las 14 categorías se degradan a `Icons.category` y **ningún**
+    // typo, todas las categorías se degradan a `Icons.category` y **ningún**
     // otro test falla, porque el fallback es legal por diseño.
-    test('las 14 categorías de la semilla tienen icono propio', () {
+    test('todas las categorías de la semilla tienen icono propio', () {
       final sinIcono = defaultCategories
           .where((c) => !CategoryIconRegistry.has(c.iconKey))
           .map((c) => '${c.name} -> ${c.iconKey}')

@@ -13,24 +13,27 @@ import '../helpers/fakes.dart';
 /// reconstruye el dashboard entero. Estos tests fijan el criterio.
 void main() {
   group('identidad por id', () {
-    test('dos movimientos con el mismo id son iguales aunque todo lo demás no', () {
-      final a = buildMovement(
-        id: 7,
-        amount: 1000,
-        date: DateTime(2026, 1, 10),
-        description: 'uno',
-      );
-      final b = buildMovement(
-        id: 7,
-        amount: 999999,
-        date: DateTime(2025, 6, 1),
-        description: 'otro',
-        type: MovementType.income,
-      );
+    test(
+      'dos movimientos con el mismo id son iguales aunque todo lo demás no',
+      () {
+        final a = buildMovement(
+          id: 7,
+          amount: 1000,
+          date: DateTime(2026, 1, 10),
+          description: 'uno',
+        );
+        final b = buildMovement(
+          id: 7,
+          amount: 999999,
+          date: DateTime(2025, 6, 1),
+          description: 'otro',
+          type: MovementType.income,
+        );
 
-      expect(a, b);
-      expect(a.hashCode, b.hashCode);
-    });
+        expect(a, b);
+        expect(a.hashCode, b.hashCode);
+      },
+    );
 
     test('movimientos con distinto id no son iguales', () {
       final a = buildMovement(id: 1, amount: 1000, date: DateTime(2026, 1, 10));
@@ -58,7 +61,11 @@ void main() {
   group('Category: identidad por id', () {
     test('misma id es igualdad aunque cambie el resto', () {
       final a = buildCategory(id: 4, name: 'Comida');
-      final b = buildCategory(id: 4, name: 'Renombrada', type: MovementType.income);
+      final b = buildCategory(
+        id: 4,
+        name: 'Renombrada',
+        type: MovementType.income,
+      );
 
       expect(a, b);
       expect(a.hashCode, b.hashCode);

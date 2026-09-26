@@ -5,11 +5,7 @@ import '../category_icon_registry.dart';
 
 /// §12 — Ícono circular con el color de la categoría.
 class CategoryIcon extends StatelessWidget {
-  const CategoryIcon({
-    required this.category,
-    this.size = 44,
-    super.key,
-  });
+  const CategoryIcon({required this.category, this.size = 44, super.key});
 
   final Category category;
   final double size;

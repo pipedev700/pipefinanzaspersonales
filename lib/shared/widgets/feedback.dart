@@ -9,11 +9,7 @@ enum SnackBarKind { success, error, info }
 ///
 /// Si no hay `ScaffoldMessenger` (todavía no hay `Scaffold`, o la pantalla ya
 /// se cerró) no hace nada: es mejor no mostrar nada que lanzar.
-void showAppSnackBar(
-  BuildContext context,
-  String message,
-  SnackBarKind kind,
-) {
+void showAppSnackBar(BuildContext context, String message, SnackBarKind kind) {
   final messenger = ScaffoldMessenger.maybeOf(context);
   if (messenger == null) return;
 

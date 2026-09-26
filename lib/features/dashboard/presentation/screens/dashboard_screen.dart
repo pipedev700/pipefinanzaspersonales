@@ -78,7 +78,7 @@ class DashboardScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 if (vacio)
-                  ..._vacio(ref, month, bars, lastMonth)
+                  ..._vacio(context, ref, month, bars, lastMonth)
                 else
                   ..._conDatos(s, month, recent, breakdown, bars),
               ],
@@ -104,6 +104,7 @@ class DashboardScreen extends ConsumerWidget {
   /// mes. Arriba, el "ver el mes actual" rescata a quien quedó en un mes
   /// pasado sin haberlo buscado.
   List<Widget> _vacio(
+    BuildContext context,
     WidgetRef ref,
     DateTime month,
     AsyncValue<List<MonthlyBar>> bars,
@@ -119,7 +120,10 @@ class DashboardScreen extends ConsumerWidget {
 
     return [
       SizedBox(
-        height: 240,
+        // Proporcional a la pantalla, como el historial y el histórico. Los
+        // 240 fijos de antes no leaban bien en un móvil pequeño y dejaban el
+        // texto fuera de la caja.
+        height: MediaQuery.sizeOf(context).height * 0.4,
         child: EmptyState(
           icon: Icons.pie_chart_outline,
           title: AppDateUtils.formatMonthRelative(month, now),
@@ -143,9 +147,8 @@ class DashboardScreen extends ConsumerWidget {
           month: anterior.month,
           income: anterior.income,
           expense: anterior.expense,
-          onTap: () => ref
-              .read(selectedMonthProvider.notifier)
-              .goTo(anterior.month),
+          onTap: () =>
+              ref.read(selectedMonthProvider.notifier).goTo(anterior.month),
         ),
         const SizedBox(height: AppSpacing.md),
       ],

@@ -37,8 +37,9 @@ void main() {
     return (light + 0.05) / (dark + 0.05);
   }
 
-  testWidgets('el monto usa el color de texto, no queda en null',
-      (tester) async {
+  testWidgets('el monto usa el color de texto, no queda en null', (
+    tester,
+  ) async {
     await pumpField(tester);
 
     final field = tester.widget<TextField>(find.byType(TextField));
@@ -47,7 +48,8 @@ void main() {
     expect(
       field.style?.color,
       isNotNull,
-      reason: 'sin color explícito lo resuelve el ambiente y puede salir '
+      reason:
+          'sin color explícito lo resuelve el ambiente y puede salir '
           'ilegible sobre surface',
     );
     expect(field.style?.color, theme.colorScheme.onSurface);
@@ -60,16 +62,20 @@ void main() {
     await tester.pump();
 
     final theme = Theme.of(tester.element(find.byType(TextField)));
-    final fill = theme.inputDecorationTheme.fillColor ??
-        theme.colorScheme.surface;
-    final amount = tester.widget<TextField>(find.byType(TextField)).style!.color!;
+    final fill =
+        theme.inputDecorationTheme.fillColor ?? theme.colorScheme.surface;
+    final amount = tester
+        .widget<TextField>(find.byType(TextField))
+        .style!
+        .color!;
 
     // AA para texto normal pide 4.5:1. El monto es a 32px, que califica
     // como texto grande (3:1), pero se comprueba el umbral exigente.
     expect(
       contrast(amount, fill),
       greaterThanOrEqualTo(4.5),
-      reason: 'contraste insuficiente entre la cifra del monto y el fondo '
+      reason:
+          'contraste insuficiente entre la cifra del monto y el fondo '
           'del campo',
     );
   });
@@ -77,8 +83,9 @@ void main() {
   testWidgets('el prefijo de moneda se mantiene en secondary', (tester) async {
     await pumpField(tester);
     final theme = Theme.of(tester.element(find.byType(TextField)));
-    final decoration =
-        tester.widget<InputDecorator>(find.byType(InputDecorator)).decoration;
+    final decoration = tester
+        .widget<InputDecorator>(find.byType(InputDecorator))
+        .decoration;
 
     expect(decoration.prefixText, contains(CurrencyFormatter.cop.symbol));
     expect(decoration.prefixStyle?.color, theme.colorScheme.onSurfaceVariant);

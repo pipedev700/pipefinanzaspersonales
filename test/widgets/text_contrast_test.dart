@@ -62,14 +62,8 @@ void main() {
     router = GoRouter(
       initialLocation: '/historial',
       routes: [
-        GoRoute(
-          path: '/historial',
-          builder: (_, _) => const HistoryScreen(),
-        ),
-        GoRoute(
-          path: '/nuevo',
-          builder: (_, _) => const MovementFormScreen(),
-        ),
+        GoRoute(path: '/historial', builder: (_, _) => const HistoryScreen()),
+        GoRoute(path: '/nuevo', builder: (_, _) => const MovementFormScreen()),
       ],
     );
   });
@@ -150,27 +144,31 @@ void main() {
     addTearDown(tester.view.reset);
   }
 
-  testWidgets('historial claro: ningún texto sin color ni sin contraste',
-      (tester) async {
+  testWidgets('historial claro: ningún texto sin color ni sin contraste', (
+    tester,
+  ) async {
     usarTelefono(tester);
     await comprobarContraste(tester, theme: AppTheme.light);
   });
 
-  testWidgets('formulario claro: ningún texto sin color ni sin contraste',
-      (tester) async {
+  testWidgets('formulario claro: ningún texto sin color ni sin contraste', (
+    tester,
+  ) async {
     usarTelefono(tester);
     router.go('/nuevo');
     await comprobarContraste(tester, theme: AppTheme.light);
   });
 
-  testWidgets('historial oscuro: ningún texto sin color ni sin contraste',
-      (tester) async {
+  testWidgets('historial oscuro: ningún texto sin color ni sin contraste', (
+    tester,
+  ) async {
     usarTelefono(tester);
     await comprobarContraste(tester, theme: AppTheme.dark);
   });
 
-  testWidgets('formulario oscuro: ningún texto sin color ni sin contraste',
-      (tester) async {
+  testWidgets('formulario oscuro: ningún texto sin color ni sin contraste', (
+    tester,
+  ) async {
     usarTelefono(tester);
     router.go('/nuevo');
     await comprobarContraste(tester, theme: AppTheme.dark);

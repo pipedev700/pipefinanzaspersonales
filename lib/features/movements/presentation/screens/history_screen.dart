@@ -4,13 +4,14 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_typography.dart';
-import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../../../../shared/widgets/empty_state.dart';
+import '../../../../shared/widgets/feedback.dart';
 import '../../../../shared/widgets/theme_mode_button.dart';
 import '../../domain/financial_values.dart';
 import '../providers/history_providers.dart';
+import '../widgets/category_filter_sheet.dart';
+import '../widgets/day_header.dart';
 import '../widgets/movement_tile.dart';
 
 /// §13 — Historial del mes, agrupado por día con subtotales.
@@ -22,6 +23,7 @@ class HistoryScreen extends ConsumerWidget {
     final groups = ref.watch(historyGroupsProvider);
     final month = ref.watch(selectedMonthProvider);
     final canAdvance = ref.watch(canAdvanceMonthProvider);
+    final filtered = ref.watch(historyCategoryFilterProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -31,20 +33,24 @@ class HistoryScreen extends ConsumerWidget {
         // 377px en una barra de 360: el título y la última acción se
         // salían de la pantalla. No se notaba en los tests porque usaban una
         // superficie de 1000px de ancho.
-        actions: const [ThemeModeButton()],
+        actions: [
+          _FilterButton(count: filtered.length),
+          const ThemeModeButton(),
+        ],
       ),
       body: Column(
         children: [
           _monthSelector(context, ref, month, canAdvance),
+          if (filtered.isNotEmpty) _ActiveFilterBar(count: filtered.length),
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
-                ref.invalidate(historyGroupsProvider);
-                ref.invalidate(movementsForSelectedMonthProvider);
+                ref.invalidate(monthMovementsProvider);
               },
               child: groups.when(
-                data: (days) =>
-                    days.isEmpty ? _empty(context, month) : _list(days),
+                data: (days) => days.isEmpty
+                    ? _empty(context, month, filtered.isNotEmpty)
+                    : _list(days),
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) => Center(
                   child: Text(
@@ -102,7 +108,7 @@ class HistoryScreen extends ConsumerWidget {
     );
   }
 
-  Widget _list(List<DailyGroup> days) {
+  ListView _list(List<DailyGroup> days) {
     return ListView.separated(
       padding: const EdgeInsets.only(bottom: AppSpacing.xl),
       itemCount: days.length,
@@ -111,9 +117,9 @@ class HistoryScreen extends ConsumerWidget {
       itemBuilder: (context, i) {
         final group = days[i];
         return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _DayHeader(group: group),
+            DayHeader(group: group),
             for (final m in group.movements)
               MovementTile(
                 movement: m,
@@ -129,7 +135,7 @@ class HistoryScreen extends ConsumerWidget {
   /// El `ListView` con `AlwaysScrollableScrollPhysics` es lo que permite tirar
   /// hacia abajo en un mes vacío: si no, el `RefreshIndicator` nunca recibe el
   /// gesto.
-  Widget _empty(BuildContext context, DateTime month) {
+  Widget _empty(BuildContext context, DateTime month, bool filtered) {
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
@@ -138,9 +144,11 @@ class HistoryScreen extends ConsumerWidget {
           child: EmptyState(
             icon: Icons.inbox_outlined,
             title: 'Sin movimientos',
-            message:
-                '${AppDateUtils.formatMonthRelative(month, DateTime.now())} '
-                'no tiene movimientos registrados.',
+            message: filtered
+                ? 'No hay movimientos de las categorías elegidas en '
+                      '${AppDateUtils.formatMonthRelative(month, DateTime.now())}.'
+                : '${AppDateUtils.formatMonthRelative(month, DateTime.now())} '
+                      'no tiene movimientos registrados.',
             actionLabel: 'Registrar movimiento',
             onAction: () => context.push(AppRoutes.newMovement),
           ),
@@ -175,42 +183,76 @@ class HistoryScreen extends ConsumerWidget {
   }
 }
 
-class _DayHeader extends StatelessWidget {
-  const _DayHeader({required this.group});
+/// Botón del AppBar que abre el selector de categorías. Muestra cuántas hay
+/// activas para que el filtro sea visible sin abrir la hoja.
+class _FilterButton extends ConsumerWidget {
+  const _FilterButton({required this.count});
 
-  final DailyGroup group;
+  final int count;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final active = count > 0;
+    return IconButton(
+      tooltip: active
+          ? 'Filtrar por categoría ($count activas)'
+          : 'Filtrar por categoría',
+      icon: Badge(
+        isLabelVisible: active,
+        label: Text('$count'),
+        child: const Icon(Icons.filter_list),
+      ),
+      onPressed: () async {
+        final changed = await CategoryFilterSheet.show(context);
+        if (changed == true && context.mounted) {
+          showAppSnackBar(
+            context,
+            'Filtrando por $count categoría${count == 1 ? '' : 's'}',
+            SnackBarKind.info,
+          );
+        }
+      },
+    );
+  }
+}
+
+/// Aviso de que hay un filtro puesto, con la forma de quitarlo sin abrir la
+/// hoja. Sin esto el usuario ve una lista más corta y no sabe por qué.
+class _ActiveFilterBar extends ConsumerWidget {
+  const _ActiveFilterBar({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       color: theme.colorScheme.surface,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        0,
+        AppSpacing.sm,
+        AppSpacing.sm,
       ),
       child: Row(
         children: [
+          Icon(Icons.filter_alt, size: 16, color: theme.colorScheme.primary),
+          const SizedBox(width: AppSpacing.xs),
           Expanded(
             child: Text(
-              AppDateUtils.formatShort(group.date),
-              style: AppTypography.label.copyWith(
-                // Sin este color el encabezado queda con `color: null` y lo
-                // resuelve el ambiente: salía blanco sobre `surface`, igual
-                // que le pasaba al monto y al nombre de las categorías.
-                color: theme.colorScheme.onSurface,
-                fontWeight: FontWeight.w600,
+              '$count categoría${count == 1 ? '' : 's'} seleccionada'
+              '${count == 1 ? '' : 's'}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ),
-          if (group.totalExpense > 0)
-            Text(
-              '-${CurrencyFormatter.cop.format(group.totalExpense)}',
-              style: AppTypography.label.copyWith(
-                color: theme.colorScheme.error,
-              ),
-            ),
+          TextButton(
+            onPressed: () =>
+                ref.read(historyCategoryFilterProvider.notifier).clear(),
+            child: const Text('Limpiar'),
+          ),
         ],
       ),
     );

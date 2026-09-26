@@ -15,22 +15,27 @@ import '../../../../core/providers/repository_providers.dart';
 ///
 /// El cálculo necesita el catálogo de categorías además de los movimientos:
 /// sin él el desglose solo tendría el id, y no el nombre, el color ni el icono.
+///
+/// Lee [monthMovementsProvider] (sin filtrar) y no
+/// [movementsForSelectedMonthProvider]: el filtro por categoría es un control
+/// de las pantallas de Historial e Histórico, y el dashboard no tiene botón
+/// para quitarlo. Mostrar aquí solo las categorías elegidas dejaría unas
+/// cifras que nadie puede explicar a simple vista.
 final monthlySummaryProvider = Provider<AsyncValue<FinancialSummary>>((ref) {
-  final movements = ref.watch(movementsForSelectedMonthProvider);
+  final movements = ref.watch(monthMovementsProvider);
   final categories = ref.watch(categoriesProvider).value ?? const [];
-  return movements.whenData(
-    (list) => FinancialSummary.from(list, categories),
-  );
+  return movements.whenData((list) => FinancialSummary.from(list, categories));
 });
 
 /// Los 5 movimientos más recientes del mes.
 ///
 /// Se apoya en el orden del DAO (`date DESC`), no en un `sort`: volver a
 /// ordenar aquí sería trabajo redundante y una fuente más de desincronización.
+/// Sin filtro por la misma razón que [monthlySummaryProvider].
 final recentMovementsProvider = Provider<AsyncValue<List<Movement>>>((ref) {
-  return ref.watch(
-    movementsForSelectedMonthProvider,
-  ).whenData((list) => list.take(5).toList(growable: false));
+  return ref
+      .watch(monthMovementsProvider)
+      .whenData((list) => list.take(5).toList(growable: false));
 });
 
 /// Categorías con gastos este mes, de mayor a menor.
@@ -39,9 +44,9 @@ final recentMovementsProvider = Provider<AsyncValue<List<Movement>>>((ref) {
 /// ya está en el resumen, y duplicar el cálculo haría que dos widgets pudieran
 /// mostrar números distintos si algún día divergieran.
 final breakdownProvider = Provider<AsyncValue<List<CategoryBreakdown>>>((ref) {
-  return ref.watch(
-    monthlySummaryProvider,
-  ).whenData((summary) => summary.byCategory);
+  return ref
+      .watch(monthlySummaryProvider)
+      .whenData((summary) => summary.byCategory);
 });
 
 /// Todos los movimientos, no solo los del mes visible. El gráfico de 6 meses
@@ -59,9 +64,9 @@ final allMovementsProvider = StreamProvider<List<Movement>>(
 final lastSixMonthsProvider = Provider<AsyncValue<List<MonthlyBar>>>((ref) {
   const calc = FinancialCalculator();
   final month = ref.watch(selectedMonthProvider);
-  return ref.watch(
-    allMovementsProvider,
-  ).whenData((all) => calc.lastMonths(all, 6, month));
+  return ref
+      .watch(allMovementsProvider)
+      .whenData((all) => calc.lastMonths(all, 6, month));
 });
 
 /// El último mes **con movimientos** de la ventana del gráfico, o `null` si en

@@ -100,15 +100,12 @@ void main() {
       buildCategory(id: 4, name: 'Regalo', sortOrder: 4),
     ]);
 
-    final actualizada = await awaitFirstValue(
-      () {
-        final value = container.read(categoriesProvider);
-        return value.hasValue && value.requireValue.length == 4
-            ? value
-            : const AsyncValue<List<Category>>.loading();
-      },
-      description: 'el catálogo con 4 categorías',
-    );
+    final actualizada = await awaitFirstValue(() {
+      final value = container.read(categoriesProvider);
+      return value.hasValue && value.requireValue.length == 4
+          ? value
+          : const AsyncValue<List<Category>>.loading();
+    }, description: 'el catálogo con 4 categorías');
 
     expect(actualizada, hasLength(4));
     expect(container.read(expenseCategoriesProvider), hasLength(4));

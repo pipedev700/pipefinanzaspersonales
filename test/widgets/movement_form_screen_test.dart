@@ -21,26 +21,26 @@ GoRouter buildRouter() {
   return GoRouter(
     initialLocation: '/',
     routes: [
-          // `push` y no `go`: el formulario se cierra con `context.pop()`, y
-          // `go` reemplazaría la pila dejando nada a lo que volver.
-          GoRoute(
-            path: '/',
-            builder: (context, state) => Scaffold(
-              body: Column(
-                children: [
-                  const Text('INICIO'),
-                  TextButton(
-                    onPressed: () => context.push('/nuevo'),
-                    child: const Text('ABRIR_NUEVO'),
-                  ),
-                  TextButton(
-                    onPressed: () => context.push('/editar/42'),
-                    child: const Text('ABRIR_EDITAR'),
-                  ),
-                ],
+      // `push` y no `go`: el formulario se cierra con `context.pop()`, y
+      // `go` reemplazaría la pila dejando nada a lo que volver.
+      GoRoute(
+        path: '/',
+        builder: (context, state) => Scaffold(
+          body: Column(
+            children: [
+              const Text('INICIO'),
+              TextButton(
+                onPressed: () => context.push('/nuevo'),
+                child: const Text('ABRIR_NUEVO'),
               ),
-            ),
+              TextButton(
+                onPressed: () => context.push('/editar/42'),
+                child: const Text('ABRIR_EDITAR'),
+              ),
+            ],
           ),
+        ),
+      ),
       GoRoute(path: '/nuevo', builder: (_, _) => const MovementFormScreen()),
       GoRoute(
         path: '/editar/:id',
@@ -132,7 +132,9 @@ void main() {
   }
 
   group('campos y validación', () {
-    testWidgets('muestra monto, categoría, fecha y descripción', (tester) async {
+    testWidgets('muestra monto, categoría, fecha y descripción', (
+      tester,
+    ) async {
       usePhoneScreen(tester);
       await openNew(tester);
 
@@ -158,20 +160,43 @@ void main() {
       expect(find.text('Selecciona una categoría'), findsOneWidget);
     });
 
-    testWidgets('el monto solo admite dígitos', (tester) async {
+    testWidgets('el monto agrupa miles y descarta lo que no es cifra', (
+      tester,
+    ) async {
       usePhoneScreen(tester);
       await openNew(tester);
 
       final field = tester.widget<TextField>(
         find.widgetWithText(TextField, '0'),
       );
-      expect(field.inputFormatters, hasLength(2));
+      expect(field.inputFormatters, hasLength(1));
       expect(field.keyboardType, TextInputType.number);
 
-      // `-`, `$` y la coma quedan fuera: `digitsOnly` los descarta.
+      // `-`, `$` y la coma quedan fuera: el `formatter` se queda solo con los
+      // dígitos y los vuelve a agrupar.
       await tester.enterText(find.widgetWithText(TextField, '0'), r'-$5,50');
       await tester.pumpAndSettle();
       expect(find.text('550'), findsOneWidget);
+
+      await tester.enterText(find.widgetWithText(TextField, '0'), '25000');
+      await tester.pumpAndSettle();
+      expect(find.text('25.000'), findsOneWidget);
+    });
+
+    testWidgets('el monto con puntos se guarda como entero', (tester) async {
+      usePhoneScreen(tester);
+      await openNew(tester);
+
+      await tester.enterText(find.widgetWithText(TextField, '0'), '1250000');
+      await tester.pumpAndSettle();
+      expect(find.text('1.250.000'), findsOneWidget);
+      await tester.tap(find.text('Comida'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+
+      expect(movements.creados.single.amount, 1250000);
     });
 
     testWidgets('guarda y vuelve a la pantalla anterior con SnackBar', (
@@ -256,7 +281,7 @@ void main() {
       await openEdit(tester);
 
       expect(find.text('Editar movimiento'), findsOneWidget);
-      expect(find.text('45000'), findsOneWidget);
+      expect(find.text('45.000'), findsOneWidget);
       expect(find.text('Guardar cambios'), findsOneWidget);
       expect(find.text('Transporte'), findsOneWidget);
       expect(find.text('10 feb 2026'), findsOneWidget);
@@ -268,7 +293,7 @@ void main() {
       movements.emit([buildExisting()]);
       await openEdit(tester);
 
-      await tester.enterText(find.widgetWithText(TextField, '45000'), '50000');
+      await tester.enterText(find.widgetWithText(TextField, '45.000'), '50000');
       await tester.pumpAndSettle();
       await tester.tap(find.text('Guardar cambios'));
       await tester.pumpAndSettle();
@@ -340,10 +365,70 @@ void main() {
         find.byType(DatePickerDialog),
       );
       final now = DateTime.now();
-      expect(
-        dialog.lastDate,
-        DateTime(now.year, now.month, now.day),
+      expect(dialog.lastDate, DateTime(now.year, now.month, now.day));
+    });
+  });
+
+  group('tildes y ñ', () {
+    // La app es en español: si algún `inputFormatter` o validación se tragara
+    // los caracteres acentuados, el usuario escribiría "Cafe" y "manana" sin
+    // poder evitarlo. Estos tests lo fijan de punta a punta: se escribe con
+    // acentos, se guarda y se comprueba lo que llegó al repositorio.
+    const conTildes = 'Café con leche y jamón, añejado en Bogotá';
+
+    testWidgets('la descripción acepta y guarda tildes, diéresis y ñ', (
+      tester,
+    ) async {
+      usePhoneScreen(tester);
+      await openNew(tester);
+      await fill(tester);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Ej: almuerzo en la oficina'),
+        conTildes,
       );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+
+      expect(movements.creados, hasLength(1));
+      expect(movements.creados.single.description, conTildes);
+    });
+
+    testWidgets('el texto acentuado se ve igual que el que no lo lleva', (
+      tester,
+    ) async {
+      usePhoneScreen(tester);
+      await openNew(tester);
+
+      final field = tester.widget<TextField>(
+        find.widgetWithText(TextField, 'Ej: almuerzo en la oficina'),
+      );
+      // El montant es el único campo filtrado: la descripción no puede
+      // llevar `inputFormatters` ni un `textInputAction` que la recorte.
+      expect(field.inputFormatters, isNull);
+      expect(field.textCapitalization, TextCapitalization.sentences);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Ej: almuerzo en la oficina'),
+        conTildes,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text(conTildes), findsOneWidget);
+    });
+
+    testWidgets('editar un movimiento con tildes las conserva', (tester) async {
+      usePhoneScreen(tester);
+      movements.emit([buildExisting(description: conTildes)]);
+      await openEdit(tester);
+
+      expect(find.text(conTildes), findsOneWidget);
+
+      await tester.tap(find.text('Guardar cambios'));
+      await tester.pumpAndSettle();
+
+      expect(movements.list.single.description, conTildes);
     });
   });
 
@@ -351,21 +436,21 @@ void main() {
   /// scroll. Estos tests lo fijan: si alguien vuelve a agrandar los iconos o
   /// a subir el número de filas, fallan en vez de degradarse en silencio.
   group('el formulario entra en una pantalla', () {
-    /// Las 10 categorías de gasto reales, que son el peor caso: con 4 de
+    /// Las 12 categorías de gasto reales, que son el peor caso: con 4 de
     /// ingreso la rejilla es de una sola fila y no llega a apretar.
-    List<Category> diezDeGasto() => List.generate(
-          10,
-          (i) => buildCategory(
-            id: i + 1,
-            name: 'Categoría ${i + 1}',
-            type: MovementType.expense,
-            sortOrder: i,
-          ),
-        );
+    List<Category> doceDeGasto() => List.generate(
+      12,
+      (i) => buildCategory(
+        id: i + 1,
+        name: 'Categoría ${i + 1}',
+        type: MovementType.expense,
+        sortOrder: i,
+      ),
+    );
 
-    testWidgets('no hay scroll con las 10 categorías de gasto', (tester) async {
+    testWidgets('no hay scroll con las 12 categorías de gasto', (tester) async {
       usePhoneScreen(tester);
-      categories = FakeCategoryRepository(diezDeGasto());
+      categories = FakeCategoryRepository(doceDeGasto());
       await openNew(tester);
 
       final posicion = tester
@@ -386,10 +471,11 @@ void main() {
       );
     });
 
-    testWidgets('los campos de entrada quedan arriba y la rejilla debajo',
-        (tester) async {
+    testWidgets('los campos de entrada quedan arriba y la rejilla debajo', (
+      tester,
+    ) async {
       usePhoneScreen(tester);
-      categories = FakeCategoryRepository(diezDeGasto());
+      categories = FakeCategoryRepository(doceDeGasto());
       await openNew(tester);
 
       double y(Finder f) => tester.getTopLeft(f).dy;
@@ -415,8 +501,9 @@ void main() {
       );
     });
 
-    testWidgets('el nombre de la categoría se pinta en color de texto',
-        (tester) async {
+    testWidgets('el nombre de la categoría se pinta en color de texto', (
+      tester,
+    ) async {
       usePhoneScreen(tester);
       await openNew(tester);
 
@@ -431,7 +518,8 @@ void main() {
       expect(
         etiqueta.style?.color,
         isNotNull,
-        reason: 'sin color explícito lo resuelve el ambiente y el nombre '
+        reason:
+            'sin color explícito lo resuelve el ambiente y el nombre '
             'puede salir blanco sobre surface',
       );
       expect(etiqueta.style?.color, theme.colorScheme.onSurface);

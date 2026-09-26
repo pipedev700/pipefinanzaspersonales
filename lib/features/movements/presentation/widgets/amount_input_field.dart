@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/utils/amount_text_formatter.dart';
 import '../../../../core/utils/currency_formatter.dart';
 
-/// §9 y §15 — Campo numérico con prefijo de moneda.
+/// §9 y §15 — Campo numérico con prefijo de moneda y separador de miles.
 ///
-/// `digitsOnly` es la primera barrera: impide escribir letras, el símbolo `$`,
-/// el signo `-` y los decimales. `validateAmount` es la segunda, para lo que
-/// llegue pegado o por otra vía.
+/// El usuario escribe `25.000` y no `25000`: el separador lo pone
+/// [ThousandsSeparatorTextInputFormatter] al vuelo y
+/// [parseAmountText] lo quita al guardar, así que el estado sigue siendo una
+/// cadena de dígitos y el dominio sigue recibiendo un entero. El estado
+/// intermedio con puntos es solo de presentación.
 class AmountInputField extends StatelessWidget {
   const AmountInputField({
     required this.controller,
@@ -29,11 +31,11 @@ class AmountInputField extends StatelessWidget {
       onChanged: onChanged,
       keyboardType: TextInputType.number,
       textInputAction: TextInputAction.next,
-      inputFormatters: [
-        FilteringTextInputFormatter.digitsOnly,
-        // `maxAmount` son 12 dígitos: suficiente para el techo de los
-        // validadores.
-        LengthLimitingTextInputFormatter(12),
+      inputFormatters: const [
+        // Cubre `digitsOnly`, el reagrupado y el tope de 12 dígitos. No se
+        // encadenan `digitsOnly` ni `LengthLimitingTextInputFormatter`: cuentan
+        // caracteres, y aquí los separadores forman parte del texto.
+        ThousandsSeparatorTextInputFormatter(),
       ],
       // Se usa `AppTypography.display` directamente y no el slot
       // `headlineMedium` del tema, para que el campo no cambie de aspecto si

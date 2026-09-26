@@ -125,10 +125,10 @@ void main() {
     });
 
     test('los ingresos no aparecen en el desglose', () {
-      final breakdown = calc.breakdownByCategory(
-        [income(3000000), expense(25000, categoryId: 1)],
-        categories,
-      );
+      final breakdown = calc.breakdownByCategory([
+        income(3000000),
+        expense(25000, categoryId: 1),
+      ], categories);
       expect(breakdown.length, 1);
       expect(breakdown.single.amount, 25000);
     });
@@ -166,13 +166,44 @@ void main() {
     test('un movimiento de medianoche agrupa con los de ese día', () {
       final list = [
         expense(1000, day: 10),
-        expense(
-          2000,
-        ).copyWith(date: DateTime(2026, 3, 10, 23, 59)),
+        expense(2000).copyWith(date: DateTime(2026, 3, 10, 23, 59)),
       ];
       final groups = calc.groupByDay(list);
       expect(groups.length, 1);
       expect(groups.single.movements.length, 2);
+    });
+
+    // El defecto que motivó `DailyGroup.net`: la cabecera pintaba solo el gasto
+    // con un "-" delante, así que un día con sueldo se veía en rojo.
+    test('net resta los gastos al ingreso del día', () {
+      final groups = calc.groupByDay([
+        income(3000000, day: 1),
+        expense(100000, day: 1),
+      ]);
+
+      expect(groups.single.net, 2900000);
+      expect(groups.single.isPositive, isTrue);
+    });
+
+    test('un día solo de gastos tiene net negativo', () {
+      final groups = calc.groupByDay([expense(85000, day: 2)]);
+
+      expect(groups.single.net, -85000);
+      expect(groups.single.isPositive, isFalse);
+    });
+
+    test('un día que empata se cuenta como positivo, no como pérdida', () {
+      final groups = calc.groupByDay([
+        income(50000, day: 3),
+        expense(50000, day: 3),
+      ]);
+
+      expect(groups.single.net, 0);
+      expect(
+        groups.single.isPositive,
+        isTrue,
+        reason: 'no ganó ni perdió; pintarlo en rojo sugeriría una pérdida',
+      );
     });
   });
 
@@ -188,10 +219,7 @@ void main() {
     });
 
     test('un mes sin gastos no baja el promedio', () {
-      final list = [
-        expense(100000, month: 1),
-        expense(300000, month: 3),
-      ];
+      final list = [expense(100000, month: 1), expense(300000, month: 3)];
       // Solo enero y marzo cuentan: (100.000 + 300.000) / 2
       expect(calc.monthlyAverage(list, 6), 200000);
     });

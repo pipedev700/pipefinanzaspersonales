@@ -73,21 +73,25 @@ class FinancialCalculator {
 
     for (final m in movements) {
       final day = DateTime(m.date.year, m.date.month, m.date.day);
-      groups.putIfAbsent(day, () {
-        order.add(day);
-        return <Movement>[];
-      }).add(m);
+      groups
+          .putIfAbsent(day, () {
+            order.add(day);
+            return <Movement>[];
+          })
+          .add(m);
     }
 
-    return order.map((day) {
-      final items = groups[day]!;
-      return DailyGroup(
-        date: day,
-        movements: items,
-        totalIncome: totalIncome(items),
-        totalExpense: totalExpense(items),
-      );
-    }).toList(growable: false);
+    return order
+        .map((day) {
+          final items = groups[day]!;
+          return DailyGroup(
+            date: day,
+            movements: items,
+            totalIncome: totalIncome(items),
+            totalExpense: totalExpense(items),
+          );
+        })
+        .toList(growable: false);
   }
 
   /// §11 — Promedio de gasto mensual, calculada sobre los meses que tienen
@@ -109,7 +113,11 @@ class FinancialCalculator {
 
   /// §12 — Ingresos y gastos de los últimos [count] meses, **de más antiguo a
   /// más reciente**, para que el gráfico de S07 se lea de izquierda a derecha.
-  List<MonthlyBar> lastMonths(List<Movement> movements, int count, DateTime ref) {
+  List<MonthlyBar> lastMonths(
+    List<Movement> movements,
+    int count,
+    DateTime ref,
+  ) {
     if (count <= 0) return const [];
 
     final income = <int, int>{};

@@ -25,8 +25,9 @@ class CategoriesDao extends DatabaseAccessor<AppDatabase>
       _sorted.watch().map((rows) => rows.map(_toEntity).toList());
 
   Future<domain.Category?> getById(int id) async {
-    final row = await (attachedDatabase.select(categories)..where((c) => c.id.equals(id)))
-        .getSingleOrNull();
+    final row = await (attachedDatabase.select(
+      categories,
+    )..where((c) => c.id.equals(id))).getSingleOrNull();
     return row == null ? null : _toEntity(row);
   }
 
@@ -56,10 +57,7 @@ class MovementsDao extends DatabaseAccessor<AppDatabase>
   /// categoría con `readTable`. Es el tipo correcto, aunque se vea raro.
   JoinedSelectStatement<HasResultSet, dynamic> _joined() {
     return attachedDatabase.select(movements).join([
-      innerJoin(
-        categories,
-        categories.id.equalsExp(movements.categoryId),
-      ),
+      innerJoin(categories, categories.id.equalsExp(movements.categoryId)),
     ])..orderBy([OrderingTerm.desc(movements.date)]);
   }
 
@@ -70,11 +68,10 @@ class MovementsDao extends DatabaseAccessor<AppDatabase>
   /// cálculos financieros van en Dart (S02).
   Stream<List<domain.Movement>> watchByMonth(DateTime month) {
     final range = monthRange(month);
-    return (_joined()
-          ..where(
-            movements.date.isBiggerOrEqualValue(range.start) &
-                movements.date.isSmallerThanValue(range.end),
-          ))
+    return (_joined()..where(
+          movements.date.isBiggerOrEqualValue(range.start) &
+              movements.date.isSmallerThanValue(range.end),
+        ))
         .watch()
         .map(_toEntities);
   }
@@ -82,20 +79,31 @@ class MovementsDao extends DatabaseAccessor<AppDatabase>
   Future<List<domain.Movement>> getByMonth(DateTime month) async {
     final range = monthRange(month);
     return _toEntities(
-      await (_joined()
-            ..where(
-              movements.date.isBiggerOrEqualValue(range.start) &
-                  movements.date.isSmallerThanValue(range.end),
-            ))
+      await (_joined()..where(
+            movements.date.isBiggerOrEqualValue(range.start) &
+                movements.date.isSmallerThanValue(range.end),
+          ))
           .get(),
     );
   }
 
-  Future<List<domain.Movement>> getAll() async => _toEntities(await _joined().get());
+  /// Intervalo `[start, end)` para la pantalla de histórico. Comparte la
+  /// columna `date` con [watchByMonth], así que se apoya en el mismo índice.
+  Stream<List<domain.Movement>> watchByRange(DateTime start, DateTime end) {
+    return (_joined()..where(
+          movements.date.isBiggerOrEqualValue(start) &
+              movements.date.isSmallerThanValue(end),
+        ))
+        .watch()
+        .map(_toEntities);
+  }
+
+  Future<List<domain.Movement>> getAll() async =>
+      _toEntities(await _joined().get());
 
   Future<domain.Movement?> getById(int id) async {
-    final row =
-        await (_joined()..where(movements.id.equals(id))).getSingleOrNull();
+    final row = await (_joined()..where(movements.id.equals(id)))
+        .getSingleOrNull();
     if (row == null) return null;
     return _toEntity(row.readTable(movements), row.readTable(categories));
   }
@@ -108,15 +116,22 @@ class MovementsDao extends DatabaseAccessor<AppDatabase>
   /// una marca de tiempo nueva en cada edición. `write` solo toca las
   /// columnas presentes, así que `createdAt` se preserva.
   ///
+  /// El `where` no es opcional. `attachedDatabase.update(movements).write(...)`
+  /// sin él genera `UPDATE movements SET ...` **sin WHERE**, o sea que aplica
+  /// a todas las filas. Además el `SET` incluía `id` (el `companion` venía de
+  /// `MovementsCompanion.insert`, que lo omite, y `copyWith` lo añadía), así
+  /// que el UPDATE intentaba poner el mismo id en cada fila y SQLite lo
+  /// rechazaba con "UNIQUE constraint failed: movements.id" en cuanto había
+  /// un segundo movimiento en la tabla. El error lo tragaba el `catch` del
+  /// controlador y el usuario solo veía "No se pudo guardar".
+  ///
   /// `write` devuelve el número de filas afectadas: se traduce a `bool`
   /// porque "no había fila con ese id" es el único caso de fallo posible.
   Future<bool> updateMovementById(int id, MovementsCompanion entry) async {
-    final changed = await attachedDatabase.update(movements).write(
-      entry.copyWith(
-        id: Value(id),
-        updatedAt: Value(DateTime.now()),
-      ),
-    );
+    final changed =
+        await (attachedDatabase.update(movements)
+              ..where((m) => m.id.equals(id)))
+            .write(entry.copyWith(updatedAt: Value(DateTime.now())));
     return changed > 0;
   }
 
@@ -124,12 +139,7 @@ class MovementsDao extends DatabaseAccessor<AppDatabase>
       (attachedDatabase.delete(movements)..where((m) => m.id.equals(id))).go();
 
   List<domain.Movement> _toEntities(List<TypedResult> rows) => rows
-      .map(
-        (r) => _toEntity(
-          r.readTable(movements),
-          r.readTable(categories),
-        ),
-      )
+      .map((r) => _toEntity(r.readTable(movements), r.readTable(categories)))
       .toList();
 
   domain.Movement _toEntity(MovementRow m, CategoryRow c) => domain.Movement(

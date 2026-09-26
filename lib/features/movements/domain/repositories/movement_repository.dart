@@ -39,6 +39,12 @@ abstract interface class MovementRepository {
   /// D12 — Filtra el rango de fechas en la consulta; los cálculos van en Dart.
   Stream<List<Movement>> watchByMonth(DateTime month);
 
+  /// Intervalo `[start, end)` para la pantalla de histórico. A diferencia de
+  /// [watchByMonth] el rango lo elige el usuario, así que entra por
+  /// parámetro. [end] es **excluido**: se pasa el día siguiente al último
+  /// seleccionado.
+  Stream<List<Movement>> watchByRange(DateTime start, DateTime end);
+
   Future<List<Movement>> getByMonth(DateTime month);
   Future<List<Movement>> getAll();
   Future<Movement?> getById(int id);

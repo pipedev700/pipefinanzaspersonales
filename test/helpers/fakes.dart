@@ -9,6 +9,27 @@ import 'package:pipefinanzaspersonales/features/movements/domain/repositories/mo
 /// Fakes en memoria para probar `presentation` sin base de datos.
 /// Se crean por secuencia según se necesitan, no todos de golpe.
 
+/// Stream que entrega el estado actual y **después** todo lo que llegue.
+///
+/// La suscripción al [_controller] se abre **antes** de emitir el estado
+/// actual, y no con un `async*` (`yield actual; yield* controller.stream`).
+/// Un `StreamController.broadcast` descarta los eventos mientras no tiene
+/// oyentes, y el generador `async*` solo entra en el `yield*` cuando el
+/// consumidor pide el siguiente evento: entre la primera entrega y esa petición
+/// hay una ventana en la que un `emit()` se pierde. Con Drift no pasa porque la
+/// consulta ya está abierta cuando llega el valor, así que el fake debe
+/// comportarse igual o los tests pasan por casualidad y fallan solos.
+Stream<T> _replay<T>(StreamController<T> controller, T Function() current) {
+  return Stream.multi((sink) {
+    final subscription = controller.stream.listen(
+      sink.add,
+      onError: sink.addError,
+    );
+    sink.add(current());
+    sink.onCancel = subscription.cancel;
+  });
+}
+
 Category buildCategory({
   required int id,
   String? name,
@@ -30,8 +51,19 @@ Category buildCategory({
 /// Catálogo de pruebas: 2 gastos + 1 ingreso, en orden de `sortOrder`.
 final testCategories = <Category>[
   buildCategory(id: 1, name: 'Comida', iconKey: 'restaurant', sortOrder: 1),
-  buildCategory(id: 2, name: 'Transporte', iconKey: 'directions_bus', sortOrder: 2),
-  buildCategory(id: 3, name: 'Salario', type: MovementType.income, iconKey: 'work', sortOrder: 3),
+  buildCategory(
+    id: 2,
+    name: 'Transporte',
+    iconKey: 'directions_bus',
+    sortOrder: 2,
+  ),
+  buildCategory(
+    id: 3,
+    name: 'Salario',
+    type: MovementType.income,
+    iconKey: 'work',
+    sortOrder: 3,
+  ),
 ];
 
 /// Constructor de movimientos de pruebas. `id` y `date` se pasan siempre
@@ -75,10 +107,7 @@ class FakeCategoryRepository implements CategoryRepository {
   }
 
   @override
-  Stream<List<Category>> watchAll() async* {
-    yield _categories;
-    yield* _controller.stream;
-  }
+  Stream<List<Category>> watchAll() => _replay(_controller, () => _categories);
 
   @override
   Future<List<Category>> getAll() async => _categories;
@@ -123,10 +152,7 @@ class FakeMovementRepository implements MovementRepository {
   void emitError(Object error) => _controller.addError(error);
 
   @override
-  Stream<List<Movement>> watchAll() async* {
-    yield _movements;
-    yield* _controller.stream;
-  }
+  Stream<List<Movement>> watchAll() => _replay(_controller, () => _movements);
 
   /// El DAO real filtra en SQL **y ordena `date DESC`**. El fake replica las
   /// dos cosas: si no, el historial en los tests saldría en orden distinto al
@@ -142,6 +168,19 @@ class FakeMovementRepository implements MovementRepository {
   @override
   Stream<List<Movement>> watchByMonth(DateTime month) =>
       watchAll().map((_) => _monthOf(month));
+
+  /// Réplica de `[start, end)`: el DAO real filtra en SQL y el fake en Dart,
+  /// con el mismo criterio. Si no, los tests de la pantalla de histórico
+  /// pasarían con rangos que en producción no devuelven nada.
+  @override
+  Stream<List<Movement>> watchByRange(DateTime start, DateTime end) =>
+      watchAll().map(
+        (movements) =>
+            movements
+                .where((m) => !m.date.isBefore(start) && m.date.isBefore(end))
+                .toList()
+              ..sort((a, b) => b.date.compareTo(a.date)),
+      );
 
   @override
   Future<List<Movement>> getAll() async => _movements;

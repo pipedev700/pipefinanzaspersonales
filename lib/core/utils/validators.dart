@@ -1,3 +1,5 @@
+import 'amount_text_formatter.dart';
+
 /// Resultado de una validación. Sin Flutter: son funciones puras y se
 /// testean sin widget (§15, §32).
 class ValidationResult {
@@ -16,21 +18,28 @@ const maxAmount = 999999999999;
 /// Límite de la descripción (§15).
 const maxDescriptionLength = 100;
 
-/// §15 — Monto: entero de dígitos, mayor a cero, sin signo ni separadores.
-/// El campo de entrada usa `digitsOnly`, así que esto es la segunda barrera.
+/// §15 — Monto: entero de dígitos, mayor a cero.
+///
+/// El campo de entrada agrupa con puntos (`25.000`), así que el separador se
+/// acepta; lo que no se acepta es nada más: ni signo, ni símbolo de moneda,
+/// ni un punto que no sea separador de miles (`1.5` es un decimal mal escrito,
+/// no un grupo de miles). La coma se rechaza explícitamente porque en `es_CO`
+/// es el decimal. El entero sale de [parseAmountText].
 ValidationResult validateAmount(String? raw) {
   final text = (raw ?? '').trim();
   if (text.isEmpty) return const ValidationResult.invalid('Ingresa un monto');
 
-  if (text.contains('.') || text.contains(',')) {
+  if (text.contains(',')) {
     return const ValidationResult.invalid('Ingresa un monto sin decimales');
   }
-  if (!RegExp(r'^\d+$').hasMatch(text)) {
+  if (!_groupedInteger.hasMatch(text)) {
     return const ValidationResult.invalid('Ingresa solo números');
   }
 
-  final value = int.tryParse(text);
-  if (value == null) return const ValidationResult.invalid('Ingresa un monto');
+  final value = parseAmountText(text);
+  if (value == null) {
+    return const ValidationResult.invalid('Ingresa un monto');
+  }
   if (value == 0) {
     return const ValidationResult.invalid('El monto debe ser mayor a cero');
   }
@@ -40,11 +49,18 @@ ValidationResult validateAmount(String? raw) {
   return const ValidationResult.ok();
 }
 
+/// Un entero, ya sea pelado (`25000`) o con puntos de miles bien puestos
+/// (`25.000`). Cubre a los dos lados del mismo formato: el validador acepta lo
+/// que el campo produce, sin abrir la puerta a `-5000` ni a `1.5`.
+final _groupedInteger = RegExp(r'^\d+(\.\d{3})*$');
+
 /// §15 — Descripción: opcional, máximo 100 caracteres.
 ValidationResult validateDescription(String? raw) {
   final text = (raw ?? '').trim();
   if (text.length > maxDescriptionLength) {
-    return const ValidationResult.invalid('Máximo $maxDescriptionLength caracteres');
+    return const ValidationResult.invalid(
+      'Máximo $maxDescriptionLength caracteres',
+    );
   }
   return const ValidationResult.ok();
 }
@@ -56,11 +72,7 @@ ValidationResult validateDate(DateTime? date, {DateTime? now}) {
   }
 
   final reference = now ?? DateTime.now();
-  final today = DateTime(
-    reference.year,
-    reference.month,
-    reference.day,
-  );
+  final today = DateTime(reference.year, reference.month, reference.day);
   final selected = DateTime(date.year, date.month, date.day);
 
   if (selected.isAfter(today)) {

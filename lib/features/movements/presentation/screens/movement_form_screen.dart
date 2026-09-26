@@ -22,8 +22,7 @@ class MovementFormScreen extends ConsumerStatefulWidget {
   final int? id;
 
   @override
-  ConsumerState<MovementFormScreen> createState() =>
-      _MovementFormScreenState();
+  ConsumerState<MovementFormScreen> createState() => _MovementFormScreenState();
 }
 
 class _MovementFormScreenState extends ConsumerState<MovementFormScreen> {
@@ -77,7 +76,9 @@ class _MovementFormScreenState extends ConsumerState<MovementFormScreen> {
     _seedIfNeeded(state);
 
     final categories = ref.watch(
-      state.type.isExpense ? expenseCategoriesProvider : incomeCategoriesProvider,
+      state.type.isExpense
+          ? expenseCategoriesProvider
+          : incomeCategoriesProvider,
     );
     final theme = Theme.of(context);
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
@@ -138,7 +139,9 @@ class _MovementFormScreenState extends ConsumerState<MovementFormScreen> {
               : CategoryPicker(
                   categories: categories,
                   selectedId: state.categoryId,
-                  onChanged: ref.read(movementFormProvider.notifier).setCategory,
+                  onChanged: ref
+                      .read(movementFormProvider.notifier)
+                      .setCategory,
                 ),
           // El error de categoría solo aparece tras intentar guardar: en
           // una pantalla recién abierta sería ruido, no ayuda (§15).
@@ -223,11 +226,7 @@ class _MovementFormScreenState extends ConsumerState<MovementFormScreen> {
       await ref.read(movementRepositoryProvider).delete(id);
     } catch (_) {
       if (mounted) {
-        showAppSnackBar(
-          context,
-          'No se pudo eliminar',
-          SnackBarKind.error,
-        );
+        showAppSnackBar(context, 'No se pudo eliminar', SnackBarKind.error);
       }
       return;
     }

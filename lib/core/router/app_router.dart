@@ -5,6 +5,7 @@ abstract final class AppRoutes {
   static const splash = '/splash';
   static const dashboard = '/';
   static const history = '/historial';
+  static const historical = '/historico';
   static const newMovement = '/movimiento/nuevo';
   static const movementById = '/movimiento/:id';
 

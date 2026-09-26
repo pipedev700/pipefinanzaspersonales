@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/providers/repository_providers.dart';
+import '../../../../core/utils/amount_text_formatter.dart';
 import '../../../../core/utils/validators.dart';
 import '../../domain/entities/movement_type.dart';
 import '../../domain/repositories/movement_repository.dart';
@@ -124,7 +125,9 @@ class MovementFormController extends Notifier<MovementFormState> {
 
     state = MovementFormState(
       id: movement.id,
-      amount: movement.amount.toString(),
+      // Se precarga ya agrupado: el campo muestra `25.000` desde el primer
+      // frame, igual que si el usuario lo acabara de teclear.
+      amount: groupThousands(movement.amount.toString()),
       type: movement.type,
       categoryId: movement.category.id,
       date: movement.date,
@@ -171,7 +174,8 @@ class MovementFormController extends Notifier<MovementFormState> {
 
     try {
       final draft = MovementDraft(
-        amount: int.parse(state.amount.trim()),
+        // El estado lleva puntos de miles; aquí se vuelve a entero.
+        amount: parseAmountText(state.amount)!,
         type: state.type,
         categoryId: state.categoryId!,
         date: state.date!,

@@ -68,7 +68,10 @@ void main() {
 
       // Desde el mes actual, avanzar no debe hacer nada.
       notifier.next();
-      expect(container.read(selectedMonthProvider), DateTime(now.year, now.month));
+      expect(
+        container.read(selectedMonthProvider),
+        DateTime(now.year, now.month),
+      );
 
       // Pero desde un mes pasado sí avanza.
       notifier.goTo(DateTime(2025, 5));
@@ -221,7 +224,8 @@ void main() {
 
       expect(state.isEditing, isTrue);
       expect(state.id, 42);
-      expect(state.amount, '45000');
+      // Precarga ya agrupado: el campo muestra `45.000` desde el primer frame.
+      expect(state.amount, '45.000');
       expect(state.type, MovementType.income);
       expect(state.categoryId, 3);
       expect(state.date, DateTime(2026, 2, 10));
@@ -292,6 +296,10 @@ class _FailingMovementRepository implements MovementRepository {
   Stream<List<Movement>> watchByMonth(DateTime month) => const Stream.empty();
 
   @override
+  Stream<List<Movement>> watchByRange(DateTime start, DateTime end) =>
+      const Stream.empty();
+
+  @override
   Future<List<Movement>> getAll() async => const [];
 
   @override
@@ -301,7 +309,8 @@ class _FailingMovementRepository implements MovementRepository {
   Future<Movement?> getById(int id) async => null;
 
   @override
-  Future<int> create(MovementDraft draft) async => throw StateError('disco lleno');
+  Future<int> create(MovementDraft draft) async =>
+      throw StateError('disco lleno');
 
   @override
   Future<bool> update(int id, MovementDraft draft) async =>
