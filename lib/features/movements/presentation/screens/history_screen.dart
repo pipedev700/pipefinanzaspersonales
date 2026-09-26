@@ -8,6 +8,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_utils.dart';
 import '../../../../shared/widgets/empty_state.dart';
+import '../../../../shared/widgets/theme_mode_button.dart';
 import '../../domain/financial_values.dart';
 import '../providers/history_providers.dart';
 import '../widgets/movement_tile.dart';
@@ -25,43 +26,79 @@ class HistoryScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Historial'),
-        actions: [
-          IconButton(
-            tooltip: 'Mes anterior',
-            icon: const Icon(Icons.chevron_left),
-            onPressed: () =>
-                ref.read(selectedMonthProvider.notifier).previous(),
-          ),
-          TextButton(
-            onPressed: () => _showMonthPicker(context, ref, month),            child: Text(AppDateUtils.formatMonth(month)),
-          ),
-          IconButton(
-            // Deshabilitado en el mes en curso: `next()` ya ignoraría el
-            // toque, pero un botón que no reacciona parece roto.
-            tooltip: 'Mes siguiente',
-            icon: const Icon(Icons.chevron_right),
-            onPressed: canAdvance
-                ? () => ref.read(selectedMonthProvider.notifier).next()
-                : null,
+        // El selector de mes vive en el cuerpo, no aquí. Con las flechas, el
+        // mes pulsable y el botón de tema en el AppBar, las acciones sumaban
+        // 377px en una barra de 360: el título y la última acción se
+        // salían de la pantalla. No se notaba en los tests porque usaban una
+        // superficie de 1000px de ancho.
+        actions: const [ThemeModeButton()],
+      ),
+      body: Column(
+        children: [
+          _monthSelector(context, ref, month, canAdvance),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(historyGroupsProvider);
+                ref.invalidate(movementsForSelectedMonthProvider);
+              },
+              child: groups.when(
+                data: (days) =>
+                    days.isEmpty ? _empty(context, month) : _list(days),
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(
+                  child: Text(
+                    'No se pudo cargar el historial',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(historyGroupsProvider);
-          ref.invalidate(movementsForSelectedMonthProvider);
-        },
-        child: groups.when(
-          data: (days) => days.isEmpty ? _empty(context, month) : _list(days),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(
-            child: Text(
-              'No se pudo cargar el historial',
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+    );
+  }
+
+  /// `‹ mes ›` con el mes pulsable para abrir el selector de fecha. Es la fila
+  /// que antes estaba en el AppBar.
+  Widget _monthSelector(
+    BuildContext context,
+    WidgetRef ref,
+    DateTime month,
+    bool canAdvance,
+  ) {
+    return Row(
+      children: [
+        IconButton(
+          tooltip: 'Mes anterior',
+          icon: const Icon(Icons.chevron_left),
+          onPressed: () => ref.read(selectedMonthProvider.notifier).previous(),
+        ),
+        Expanded(
+          child: Center(
+            child: TextButton(
+              onPressed: () => _showMonthPicker(context, ref, month),
+              child: Text(
+                AppDateUtils.formatMonth(month),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
         ),
-      ),
+        IconButton(
+          // Deshabilitado en el mes en curso: `next()` ya ignoraría el
+          // toque, pero un botón que no reacciona parece roto.
+          tooltip: 'Mes siguiente',
+          icon: const Icon(Icons.chevron_right),
+          onPressed: canAdvance
+              ? () => ref.read(selectedMonthProvider.notifier).next()
+              : null,
+        ),
+      ],
     );
   }
 

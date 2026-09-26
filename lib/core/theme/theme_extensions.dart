@@ -25,6 +25,15 @@ class SemanticColors extends ThemeExtension<SemanticColors> {
     surfaceVariant: AppColors.surfaceVariant,
   );
 
+  /// Variante oscura: los semánticos suben de tono para mantener el contraste
+  /// sobre `darkSurface`. Ver la nota de los `dark*` en `AppColors`.
+  static const dark = SemanticColors(
+    income: AppColors.darkIncome,
+    expense: AppColors.darkExpense,
+    warning: AppColors.darkWarning,
+    surfaceVariant: AppColors.darkSurfaceVariant,
+  );
+
   @override
   SemanticColors copyWith({
     Color? income,

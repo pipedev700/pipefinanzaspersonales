@@ -7,6 +7,8 @@ import 'package:pipefinanzaspersonales/core/theme/app_theme.dart';
 import 'package:pipefinanzaspersonales/core/theme/theme_extensions.dart';
 import 'package:pipefinanzaspersonales/features/dashboard/presentation/widgets/balance_card.dart';
 import 'package:pipefinanzaspersonales/features/dashboard/presentation/widgets/category_breakdown.dart';
+import 'package:pipefinanzaspersonales/features/dashboard/presentation/widgets/last_month_card.dart';
+import 'package:pipefinanzaspersonales/features/dashboard/presentation/widgets/month_selector.dart';
 import 'package:pipefinanzaspersonales/features/dashboard/presentation/widgets/monthly_bars.dart';
 import 'package:pipefinanzaspersonales/features/dashboard/presentation/widgets/totals_row.dart';
 import 'package:pipefinanzaspersonales/features/movements/domain/entities/movement_type.dart';
@@ -35,6 +37,11 @@ Finder inTotals(String text) =>
 
 Finder inBreakdown(String text) => find.descendant(
   of: find.byType(CategoryBreakdownList),
+  matching: find.text(text),
+);
+
+Finder inLastMonth(String text) => find.descendant(
+  of: find.byType(LastMonthCard),
   matching: find.text(text),
 );
 
@@ -407,9 +414,11 @@ void main() {
     });
 
     testWidgets('se omite si la ventana entera está vacía', (tester) async {
-      // Se monta el widget suelto: desde el dashboard es imposible llegar con
-      // seis meses a cero, porque si el mes visible no tiene movimientos se
-      // muestra el estado vacío en su lugar. La guarda es defensiva.
+      // Se monta el widget suelto. Desde el dashboard el mes visible sin
+      // movimientos ya no es una excepción: la pantalla muestra el estado vacío
+      // **y** el gráfico, que es justo el caso que comprueba este widget. La
+      // guarda es para la ventana entera en cero, que sí puede llegar desde
+      // una base recién creada.
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.light,
@@ -546,6 +555,173 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('No se pudo cargar el resumen'), findsOneWidget);
+    });
+  });
+
+  /// El caso que reportó el usuario: se registra un movimiento del mes en
+  /// curso, se llega a la pantalla de inicio viendo el mes anterior y esta
+  /// muestra "Aún no tienes movimientos" con las flechas desaparecidas. Sin
+  /// selector no había forma de volver al mes con los datos recién creados.
+  group('mes sin movimientos', () {
+    testWidgets('el selector sigue visible, con las dos flechas', (
+      tester,
+    ) async {
+      useTallScreen(tester);
+      await openDashboard(tester);
+
+      expect(find.textContaining('Aún no tienes movimientos'), findsOneWidget);
+      expect(find.byType(MonthSelector), findsOneWidget);
+      expect(find.byTooltip('Mes anterior').hitTestable(), findsOneWidget);
+      // Sin datos en ninguna parte el `›` está deshabilitado, pero presente:
+      // en un mes pasado se habilita, y es el que faltaba.
+      expect(find.byTooltip('Mes siguiente').hitTestable(), findsOneWidget);
+    });
+
+    testWidgets('el resumen del último mes con datos va debajo del mensaje', (
+      tester,
+    ) async {
+      useTallScreen(tester);
+      final previous = DateTime(month.year, month.month - 1);
+      movements.emit([
+        buildMovement(
+          id: 1,
+          amount: 120000,
+          date: DateTime(previous.year, previous.month, 5),
+        ),
+        buildMovement(
+          id: 2,
+          amount: 500000,
+          date: DateTime(previous.year, previous.month, 6),
+          type: MovementType.income,
+        ),
+      ]);
+      await openDashboard(tester);
+
+      expect(find.byType(LastMonthCard), findsOneWidget);
+      expect(
+        find.text('Resumen de ${_monthName(previous.month)} ${previous.year}'),
+        findsOneWidget,
+      );
+      expect(inLastMonth('+\$380.000'), findsOneWidget);
+      expect(
+        inLastMonth(r'$500.000 de ingresos · $120.000 de gastos'),
+        findsOneWidget,
+      );
+
+      // "Abajo" es parte del encargo: el resumen no puede quedar por encima
+      // del mensaje, que es lo que el usuario ya estaba leyendo.
+      final mensaje = tester.getTopLeft(
+        find.textContaining('Aún no tienes movimientos'),
+      );
+      final resumen = tester.getTopLeft(find.byType(LastMonthCard));
+      expect(mensaje.dy, lessThan(resumen.dy));
+    });
+
+    testWidgets('el resumen lleva a ese mes', (tester) async {
+      useTallScreen(tester);
+      final previous = DateTime(month.year, month.month - 1);
+      movements.emit([
+        buildMovement(
+          id: 1,
+          amount: 90000,
+          date: DateTime(previous.year, previous.month, 5),
+        ),
+      ]);
+      await openDashboard(tester);
+
+      await tester.tap(find.byType(LastMonthCard));
+      await tester.pumpAndSettle();
+
+      // Un toque al resumen sustituye el estado vacío por el panel de ese mes.
+      expect(find.textContaining('Aún no tienes movimientos'), findsNothing);
+      expect(
+        find.text('Balance · ${_monthName(previous.month)} ${previous.year}'),
+        findsOneWidget,
+      );
+      expect(inBalance('-\$90.000'), findsOneWidget);
+    });
+
+    testWidgets('el gráfico de 6 meses también se ve en el mes vacío', (
+      tester,
+    ) async {
+      useTallScreen(tester);
+      final previous = DateTime(month.year, month.month - 1);
+      movements.emit([
+        buildMovement(
+          id: 1,
+          amount: 400000,
+          date: DateTime(previous.year, previous.month, 5),
+        ),
+      ]);
+      await openDashboard(tester);
+
+      expect(find.textContaining('Aún no tienes movimientos'), findsOneWidget);
+      expect(find.text('Últimos 6 meses'), findsOneWidget);
+    });
+
+    testWidgets('"ver el mes actual" solo aparece fuera del mes en curso y vuelve', (
+      tester,
+    ) async {
+      useTallScreen(tester);
+      movements.emit([
+        buildMovement(id: 1, amount: 80000, date: DateTime(month.year, month.month, 3)),
+      ]);
+      await openDashboard(tester);
+      // El mes en curso tiene datos, así que no hay a dónde "volver".
+      expect(find.text('Ver el mes actual'), findsNothing);
+
+      await tester.tap(find.byTooltip('Mes anterior').hitTestable());
+      await tester.pumpAndSettle();
+      // Mes pasado vacío con el mes en curso lleno: el caso del usuario.
+      expect(find.textContaining('Aún no tienes movimientos'), findsOneWidget);
+      expect(find.text('Ver el mes actual'), findsOneWidget);
+      // Y el mes anterior tampoco tiene datos de nada, así que no hay resumen
+      // que ofrecer: la ventana de seis meses está vacía.
+      expect(find.byType(LastMonthCard), findsNothing);
+
+      await tester.tap(find.text('Ver el mes actual'));
+      await tester.pumpAndSettle();
+
+      expect(inBalance('-\$80.000'), findsOneWidget);
+      expect(find.text('Ver el mes actual'), findsNothing);
+    });
+
+    testWidgets('sin datos en la ventana no hay resumen ni gráfico', (
+      tester,
+    ) async {
+      useTallScreen(tester);
+      await openDashboard(tester);
+
+      expect(find.textContaining('Aún no tienes movimientos'), findsOneWidget);
+      expect(find.byType(LastMonthCard), findsNothing);
+      expect(find.text('Últimos 6 meses'), findsNothing);
+      expect(find.text('Ver el mes actual'), findsNothing);
+    });
+
+    testWidgets('registrar un movimiento quita el estado vacío al volver', (
+      tester,
+    ) async {
+      // El otro lado del reporte del usuario: se registró el movimiento y la
+      // pantalla siguió en blanco. Aquí se recorre el camino entero, con el
+      // router real y el FAB, para que el repintado por el stream del DAO
+      // quede cubierto y no solo la escritura en el repositorio.
+      useTallScreen(tester);
+      await openDashboard(tester);
+      expect(find.textContaining('Aún no tienes movimientos'), findsOneWidget);
+
+      await tester.tap(find.byType(FloatingActionButton));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextField, '0'), '25000');
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Comida'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+
+      // Vuelta en el dashboard: el panel del mes en curso, sin recargar.
+      expect(find.textContaining('Aún no tienes movimientos'), findsNothing);
+      expect(inBalance('-\$25.000'), findsOneWidget);
+      expect(inTotals('\$25.000'), findsOneWidget);
     });
   });
 }

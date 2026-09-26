@@ -84,14 +84,21 @@ void main() {
   ///
   /// Solo se miran los que están en pantalla: un `ListView` no construye lo
   /// que queda fuera del viewport, y lo que no se pintó no se puede medir.
-  Future<void> comprobarContraste(WidgetTester tester) async {
+  ///
+  /// [theme] es lo que hace que esta guarda sirva también para el modo
+  /// oscuro: un widget que se quede con un color claro fijo sale aquí, y no
+  /// hace falta probarlo a mano en un dispositivo.
+  Future<void> comprobarContraste(
+    WidgetTester tester, {
+    required ThemeData theme,
+  }) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           movementRepositoryProvider.overrideWithValue(movements),
           categoryRepositoryProvider.overrideWithValue(categories),
         ],
-        child: MaterialApp.router(theme: AppTheme.light, routerConfig: router),
+        child: MaterialApp.router(theme: theme, routerConfig: router),
       ),
     );
     await tester.pumpAndSettle();
@@ -119,8 +126,8 @@ void main() {
       }
 
       // Fondo real del párrafo: el ancestro compuesto más cercano.
-      final fondo = _fondoDe(elemento, Theme.of(elemento).colorScheme.surface);
-      if (_contraste(color, fondo) < 4.5 && _contraste(color, fondo) < 3.0) {
+      final fondo = _fondoDe(elemento, theme.colorScheme.surface);
+      if (_contraste(color, fondo) < 3.0) {
         sinContraste.add('"$texto" ${_hex(color)} sobre ${_hex(fondo)}');
       }
     }
@@ -137,21 +144,36 @@ void main() {
     );
   }
 
-  testWidgets('historial: ningún texto sin color ni sin contraste',
-      (tester) async {
+  void usarTelefono(WidgetTester tester) {
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
-    await comprobarContraste(tester);
+  }
+
+  testWidgets('historial claro: ningún texto sin color ni sin contraste',
+      (tester) async {
+    usarTelefono(tester);
+    await comprobarContraste(tester, theme: AppTheme.light);
   });
 
-  testWidgets('formulario: ningún texto sin color ni sin contraste',
+  testWidgets('formulario claro: ningún texto sin color ni sin contraste',
       (tester) async {
-    tester.view.physicalSize = const Size(360, 800);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
+    usarTelefono(tester);
     router.go('/nuevo');
-    await comprobarContraste(tester);
+    await comprobarContraste(tester, theme: AppTheme.light);
+  });
+
+  testWidgets('historial oscuro: ningún texto sin color ni sin contraste',
+      (tester) async {
+    usarTelefono(tester);
+    await comprobarContraste(tester, theme: AppTheme.dark);
+  });
+
+  testWidgets('formulario oscuro: ningún texto sin color ni sin contraste',
+      (tester) async {
+    usarTelefono(tester);
+    router.go('/nuevo');
+    await comprobarContraste(tester, theme: AppTheme.dark);
   });
 
   testWidgets('el texto del tema ya trae color, no null', (tester) async {

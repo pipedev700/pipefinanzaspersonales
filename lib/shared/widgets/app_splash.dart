@@ -38,8 +38,11 @@ class _AppSplashState extends State<AppSplash> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: AppColors.background,
+      // Sin `backgroundColor` explícito: el del `Scaffold` viene del tema, y
+      // así el splash respeta el modo oscuro. Poner aquí el color claro
+      // dejaba un destello blanco al arrancar en oscuro.
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -48,9 +51,13 @@ class _AppSplashState extends State<AppSplash> {
             const SizedBox(height: AppSpacing.lg),
             Text(
               'Pipe Finanzas',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: AppColors.brandNavy,
-                  ),
+              // El navy de marca es casi negro: sobre el fondo oscuro
+              // desaparecería, así que en oscuro se usa el color de texto.
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: theme.brightness == Brightness.dark
+                    ? theme.colorScheme.onSurface
+                    : AppColors.brandNavy,
+              ),
             ),
             const SizedBox(height: AppSpacing.xl),
             const SizedBox(

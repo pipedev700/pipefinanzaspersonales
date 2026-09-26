@@ -63,3 +63,26 @@ final lastSixMonthsProvider = Provider<AsyncValue<List<MonthlyBar>>>((ref) {
     allMovementsProvider,
   ).whenData((all) => calc.lastMonths(all, 6, month));
 });
+
+/// El último mes **con movimientos** de la ventana del gráfico, o `null` si en
+/// esos seis meses no se registró nada.
+///
+/// Es lo que evita que el dashboard de un mes vacío sea solo el mensaje "Aún no
+/// tienes movimientos": en vez de eso muestra cuánto se movió el dinero la
+/// última vez que hubo actividad, y un toque lleva a ese mes.
+///
+/// Sale de [lastSixMonthsProvider] y no de una consulta propia porque la
+/// ventana ya está cargada para el gráfico y [FinancialCalculator.lastMonths]
+/// es quien decide qué meses caen dentro. Una segunda consulta repetiría el
+/// rango del mes en otro sitio, que es justo la duplicación que después
+/// diverge.
+final lastMonthWithDataProvider = Provider<AsyncValue<MonthlyBar?>>((ref) {
+  return ref.watch(lastSixMonthsProvider).whenData((bars) {
+    // `reversed`: la ventana viene de más antiguo a más reciente, así que el
+    // último con datos es el primero que aparece al recorrerla al revés.
+    for (final bar in bars.reversed) {
+      if (bar.income > 0 || bar.expense > 0) return bar;
+    }
+    return null;
+  });
+});

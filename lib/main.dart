@@ -13,14 +13,10 @@ void main() {
     DeviceOrientation.portraitDown,
   ]);
 
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: Colors.white,
-      systemNavigationBarIconBrightness: Brightness.dark,
-    ),
-  );
+  // El estilo de las barras del sistema **no** se fija aquí: con valores fijos
+  // la barra de navegación quedaba blanca y con los iconos oscuros incluso en
+  // modo oscuro. Lo calcula `PipeApp` a partir del tema, en un
+  // `AnnotatedRegion`, y así sigue al tema en cada cambio.
 
   runApp(const ProviderScope(child: PipeApp()));
 }

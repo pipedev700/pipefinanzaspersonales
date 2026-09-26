@@ -5,6 +5,7 @@ import 'package:pipefinanzaspersonales/features/categories/presentation/provider
 import 'package:pipefinanzaspersonales/features/dashboard/presentation/providers/dashboard_providers.dart';
 import 'package:pipefinanzaspersonales/features/movements/domain/entities/movement_type.dart';
 import 'package:pipefinanzaspersonales/features/movements/domain/financial_summary.dart';
+import 'package:pipefinanzaspersonales/features/movements/domain/financial_values.dart';
 import 'package:pipefinanzaspersonales/features/movements/presentation/providers/history_providers.dart';
 
 import '../helpers/await_first_value.dart';
@@ -357,6 +358,83 @@ void main() {
       );
 
       expect(bars[1].expense, 777000);
+    });
+  });
+
+  group('lastMonthWithDataProvider', () {
+    test('devuelve el mes más reciente con movimientos, no el más antiguo', () async {
+      final movements = FakeMovementRepository([
+        buildMovement(id: 1, amount: 7000, date: DateTime(month.year, month.month - 4, 5)),
+        buildMovement(
+          id: 2,
+          amount: 40000,
+          date: DateTime(month.year, month.month - 1, 8),
+        ),
+        buildMovement(
+          id: 3,
+          amount: 900000,
+          date: DateTime(month.year, month.month - 1, 9),
+          type: MovementType.income,
+        ),
+      ]);
+      final container = makeContainer(movements, FakeCategoryRepository());
+      container.listen(allMovementsProvider, (_, _) {});
+
+      final bar = await awaitFirstValue(
+        () => container.read(lastMonthWithDataProvider),
+        description: 'lastMonthWithDataProvider',
+      );
+
+      expect(bar, isNotNull);
+      expect(bar!.month, DateTime(month.year, month.month - 1));
+      expect(bar.income, 900000);
+      expect(bar.expense, 40000);
+    });
+
+    test('devuelve null si en la ventana no se registró nada', () async {
+      final container = makeContainer(
+        FakeMovementRepository(),
+        FakeCategoryRepository(),
+      );
+      container.listen(allMovementsProvider, (_, _) {});
+
+      final bar = await awaitFirstValue(
+        () => container.read(lastMonthWithDataProvider),
+        description: 'lastMonthWithDataProvider',
+      );
+
+      // No hay nada que resumir: inventar un mes en cero dejaría una tarjeta
+      // con un balance de $0 que parece un mes real sin actividad.
+      expect(bar, isNull);
+    });
+
+    test('la ventana va con el filtro: un mes que se sale no se ofrece', () async {
+      // El único movimiento está a cinco meses. Con el filtro en el mes actual
+      // entra en la ventana de seis; al retroceder seis meses, la ventana ya
+      // no lo alcanza y no hay nada que ofrecer.
+      final movements = FakeMovementRepository([
+        buildMovement(id: 1, amount: 50000, date: DateTime(month.year, month.month - 5, 3)),
+      ]);
+      final container = makeContainer(movements, FakeCategoryRepository());
+      container.listen(allMovementsProvider, (_, _) {});
+
+      final cerca = await awaitFirstValue(
+        () => container.read(lastMonthWithDataProvider),
+        description: 'lastMonthWithDataProvider',
+      );
+      expect(cerca?.month, DateTime(month.year, month.month - 5));
+
+      final notifier = container.read(selectedMonthProvider.notifier);
+      for (var i = 0; i < 6; i++) {
+        notifier.previous();
+      }
+
+      final lejos = await awaitValueWhere<MonthlyBar?>(
+        () => container.read(lastMonthWithDataProvider),
+        (v) => v == null,
+        description: 'lastMonthWithDataProvider sin el mes en ventana',
+      );
+      expect(lejos, isNull);
     });
   });
 

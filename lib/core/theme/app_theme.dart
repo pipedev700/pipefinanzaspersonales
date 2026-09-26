@@ -6,6 +6,48 @@ import 'app_typography.dart';
 import 'theme_extensions.dart';
 
 abstract final class AppTheme {
+  /// §33 — Tema claro.
+  static ThemeData get light => _build(
+    brightness: Brightness.light,
+    brand: AppColors.brandBlue,
+    onPrimary: AppColors.textOnPrimary,
+    indicator: AppColors.brandLight,
+    background: AppColors.background,
+    surface: AppColors.surface,
+    onSurface: AppColors.textPrimary,
+    onSurfaceVariant: AppColors.textSecondary,
+    border: AppColors.border,
+    divider: AppColors.divider,
+    semantic: SemanticColors.light,
+  );
+
+  /// §33 — Tema oscuro. Misma estructura que el claro: los dos se construyen
+  /// con [_build] y solo cambian los tokens, así que no pueden desincronizarse
+  /// por olvidarse de updating uno al tocar el otro.
+  ///
+  /// Lo que cambia además de las superficies es el azul: `brandBlue` sobre
+  /// fondo casi negro se queda en 3:1, así que el texto y los acentos usan
+  /// `darkBrand` (6.9:1). Los botones rellenos **no**: ahí el color va de fondo
+  /// y blanco encima, que con `darkBrand` daría 2.4:1. Ver la nota de
+  /// `AppColors.darkBrand`.
+  static ThemeData get dark => _build(
+    brightness: Brightness.dark,
+    brand: AppColors.darkBrand,
+    // El azul claro del oscuro necesita texto oscuro encima, no blanco.
+    onPrimary: AppColors.darkBackground,
+    // La píldora del NavigationBar es el fondo de la etiqueta e icono del
+    // destino activo, así que en oscuro va azul marino y no el azul claro del
+    // tema claro: ahí la etiqueta clara encima sería ilegible.
+    indicator: AppColors.brandNavy,
+    background: AppColors.darkBackground,
+    surface: AppColors.darkSurface,
+    onSurface: AppColors.darkTextPrimary,
+    onSurfaceVariant: AppColors.darkTextSecondary,
+    border: AppColors.darkBorder,
+    divider: AppColors.darkDivider,
+    semantic: SemanticColors.dark,
+  );
+
   /// §19 — Le pone color de texto a un estilo de la escala.
   ///
   /// Hace falta porque `AppTypography` son constantes **sin color**, a
@@ -17,119 +59,101 @@ abstract final class AppTheme {
   ///
   /// Los textos que van sobre fondo de color (botones, snackbar, appbar)
   /// declaran su color aparte y no pasan por aquí.
-  static TextStyle _on(TextStyle style) =>
-      style.copyWith(color: AppColors.textPrimary);
+  static TextStyle _on(TextStyle style, Color color) =>
+      style.copyWith(color: color);
 
-  /// Solo se implementa el tema claro (§33). Los tokens quedan
-  /// centralizados para poder añadir dark sin reescribir widgets.
-  static ThemeData get light {
+  static ThemeData _build({
+    required Brightness brightness,
+    required Color brand,
+    required Color onPrimary,
+    required Color indicator,
+    required Color background,
+    required Color surface,
+    required Color onSurface,
+    required Color onSurfaceVariant,
+    required Color border,
+    required Color divider,
+    required SemanticColors semantic,
+  }) {
     final base = ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.brandBlue,
-        brightness: Brightness.light,
-      ).copyWith(
-        primary: AppColors.brandBlue,
-        onPrimary: AppColors.textOnPrimary,
-        surface: AppColors.surface,
-        onSurface: AppColors.textPrimary,
-        onSurfaceVariant: AppColors.textSecondary,
-        error: AppColors.expense,
-        outlineVariant: AppColors.border,
-      ),
-      scaffoldBackgroundColor: AppColors.background,
+      colorScheme:
+          ColorScheme.fromSeed(
+            seedColor: brand,
+            brightness: brightness,
+          ).copyWith(
+            primary: brand,
+            onPrimary: onPrimary,
+            surface: surface,
+            onSurface: onSurface,
+            onSurfaceVariant: onSurfaceVariant,
+            error: semantic.expense,
+            outlineVariant: border,
+          ),
+      scaffoldBackgroundColor: background,
     );
 
     return base.copyWith(
-      extensions: const [SemanticColors.light],
+      extensions: [semantic],
       textTheme: base.textTheme.copyWith(
-        headlineLarge: _on(AppTypography.display),
-        headlineMedium: _on(AppTypography.display),
-        titleLarge: _on(AppTypography.title),
-        titleMedium: _on(AppTypography.title),
-        bodyLarge: _on(AppTypography.body),
-        bodyMedium: _on(AppTypography.body),
-        bodySmall: _on(AppTypography.caption),
-        labelLarge: _on(AppTypography.bodyStrong),
-        labelMedium: _on(AppTypography.label),
-        labelSmall: _on(AppTypography.caption),
+        headlineLarge: _on(AppTypography.display, onSurface),
+        headlineMedium: _on(AppTypography.display, onSurface),
+        titleLarge: _on(AppTypography.title, onSurface),
+        titleMedium: _on(AppTypography.title, onSurface),
+        bodyLarge: _on(AppTypography.body, onSurface),
+        bodyMedium: _on(AppTypography.body, onSurface),
+        bodySmall: _on(AppTypography.caption, onSurface),
+        labelLarge: _on(AppTypography.bodyStrong, onSurface),
+        labelMedium: _on(AppTypography.label, onSurface),
+        labelSmall: _on(AppTypography.caption, onSurface),
       ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.background,
-        foregroundColor: AppColors.textPrimary,
+      appBarTheme: AppBarTheme(
+        backgroundColor: background,
+        foregroundColor: onSurface,
         elevation: 0,
         scrolledUnderElevation: 0.5,
         centerTitle: false,
         titleTextStyle: TextStyle(
-          color: AppColors.textPrimary,
+          color: onSurface,
           fontSize: 20,
           fontWeight: FontWeight.w600,
         ),
       ),
-      cardTheme: const CardThemeData(
-        color: AppColors.surface,
+      cardTheme: CardThemeData(
+        color: surface,
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(
-            Radius.circular(AppSpacing.radiusMd),
-          ),
-          side: BorderSide(color: AppColors.border),
+          borderRadius: BorderRadius.all(Radius.circular(AppSpacing.radiusMd)),
+          side: BorderSide(color: border),
         ),
       ),
-      inputDecorationTheme: const InputDecorationTheme(
+      inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surface,
-        contentPadding: EdgeInsets.symmetric(
+        fillColor: surface,
+        contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
           vertical: AppSpacing.md,
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.all(
-            Radius.circular(AppSpacing.radiusSm),
-          ),
-          borderSide: BorderSide(color: AppColors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(
-            Radius.circular(AppSpacing.radiusSm),
-          ),
-          borderSide: BorderSide(color: AppColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(
-            Radius.circular(AppSpacing.radiusSm),
-          ),
-          borderSide: BorderSide(color: AppColors.brandBlue, width: 2),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(
-            Radius.circular(AppSpacing.radiusSm),
-          ),
-          borderSide: BorderSide(color: AppColors.expense),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.all(
-            Radius.circular(AppSpacing.radiusSm),
-          ),
-          borderSide: BorderSide(color: AppColors.expense, width: 2),
-        ),
+        border: _inputBorder(border),
+        enabledBorder: _inputBorder(border),
+        focusedBorder: _inputBorder(brand, width: 2),
+        errorBorder: _inputBorder(semantic.expense),
+        focusedErrorBorder: _inputBorder(semantic.expense, width: 2),
       ),
-      navigationBarTheme: const NavigationBarThemeData(
-        backgroundColor: AppColors.surface,
-        indicatorColor: AppColors.brandLight,
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: surface,
+        indicatorColor: indicator,
         elevation: 0,
         height: 64,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       ),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: AppColors.brandBlue,
         foregroundColor: AppColors.textOnPrimary,
         elevation: 2,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(
-            Radius.circular(AppSpacing.radiusMd),
-          ),
+          borderRadius: BorderRadius.all(Radius.circular(AppSpacing.radiusMd)),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -147,31 +171,35 @@ abstract final class AppTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: AppColors.brandBlue,
+          foregroundColor: brand,
           textStyle: AppTypography.label,
         ),
       ),
-      dialogTheme: const DialogThemeData(
-        backgroundColor: AppColors.surface,
+      dialogTheme: DialogThemeData(
+        backgroundColor: surface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(
-            Radius.circular(AppSpacing.radiusMd),
-          ),
+          borderRadius: BorderRadius.all(Radius.circular(AppSpacing.radiusMd)),
         ),
       ),
-      snackBarTheme: const SnackBarThemeData(
+      snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.textPrimary,
-        contentTextStyle: TextStyle(color: AppColors.textOnPrimary),
+        backgroundColor: onSurface,
+        contentTextStyle: TextStyle(color: surface),
       ),
-      dividerTheme: const DividerThemeData(
-        color: AppColors.divider,
-        thickness: 1,
+      dividerTheme: DividerThemeData(color: divider, thickness: 1),
+      listTileTheme: ListTileThemeData(
+        iconColor: onSurfaceVariant,
+        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       ),
-      listTileTheme: const ListTileThemeData(
-        iconColor: AppColors.textSecondary,
-        contentPadding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
+    );
+  }
+
+  static OutlineInputBorder _inputBorder(Color color, {double width = 1}) {
+    return OutlineInputBorder(
+      borderRadius: const BorderRadius.all(
+        Radius.circular(AppSpacing.radiusSm),
       ),
+      borderSide: BorderSide(color: color, width: width),
     );
   }
 }

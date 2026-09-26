@@ -7,6 +7,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../shared/widgets/confirm_dialog.dart';
 import '../../../../shared/widgets/feedback.dart';
+import '../../../../shared/widgets/theme_mode_button.dart';
 import '../../../categories/presentation/providers/category_providers.dart';
 import '../providers/movement_form_controller.dart';
 import '../widgets/amount_input_field.dart';
@@ -92,6 +93,7 @@ class _MovementFormScreenState extends ConsumerState<MovementFormScreen> {
               color: theme.colorScheme.error,
               onPressed: () => _confirmDelete(state.id!),
             ),
+          const ThemeModeButton(),
         ],
       ),
       body: ListView(
