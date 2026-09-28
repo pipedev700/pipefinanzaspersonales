@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- S09 — El nombre va aquí y no hardcodeado en el manifest: es el único
+         sitio que hay que tocar para localizar la app. -->
+    <string name="app_name">Pipe Finanzas</string>
+</resources>

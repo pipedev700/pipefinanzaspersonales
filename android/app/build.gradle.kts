@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.pipefinanzaspersonales"
+    namespace = "com.pipefinanzas.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,20 +20,38 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.pipefinanzaspersonales"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
+        // D3 — decisión cerrada en S09: `com.pipefinanzas.app`. Cambiarlo
+        // después de publicar es prácticamente imposible (Google Play
+        // identifica la app por firma + applicationId).
+        applicationId = "com.pipefinanzas.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
+        // §31 — La versión vive en un solo sitio, `pubspec.yaml`
+        // (`version: 1.0.0+1`): aquí no se escribe a mano para que no
+        // puedan desincronizarse. `flutter.versionCode` es el 1 y
+        // `flutter.versionName` el "1.0.0".
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // S09: el APK de release se firma con la clave de DEBUG a
+            // propósito, para que se pueda instalar y probar sin montar una
+            // cadena de firma. NO es publicable en Google Play: la clave de
+            // debug es pública y cualquiera puede falsificar una "app"
+            // firmada con ella.
+            //
+            // Para publicar, generar la clave propia UNA vez y meterla en
+            // `android/key.properties` (fuera de git, ver .gitignore):
+            //
+            //   keytool -genkey -v -keystore ~/pipe-finanzas.jks \
+            //     -keyalg RSA -keysize 2048 -validity 10000 -alias pipe
+            //
+            // y sustituir esta línea por la firma que lee `key.properties`.
+            // SIN ese paso, la primera publicación y todas las siguientes
+            // quedan bloqueadas para siempre: la clave no se puede
+            // regenerar.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
